@@ -3,12 +3,34 @@ const EARTH_RADIUS_MILES = 3958.8;
 export const TRAIN_LINE_META = {
   RED: { code: 'RED', id: 'Red', color: '#d7263d' },
   BLUE: { code: 'BLUE', id: 'Blue', color: '#2074d4' },
-  G: { code: 'G', id: 'Green', color: '#009b3a' },
   BRN: { code: 'BRN', id: 'Brown', color: '#7b4b2a' },
+  G: { code: 'G', id: 'Green', color: '#009b3a' },
+  ORG: { code: 'ORG', id: 'Orange', color: '#f47b20' },
   P: { code: 'P', id: 'Purple', color: '#522398' },
-  Y: { code: 'Y', id: 'Yellow', color: '#f4c300' },
-  Pnk: { code: 'Pnk', id: 'Pink', color: '#e27ea6' },
-  O: { code: 'O', id: 'Orange', color: '#f47b20' }
+  PINK: { code: 'PINK', id: 'Pink', color: '#e27ea6' },
+  Y: { code: 'Y', id: 'Yellow', color: '#f4c300' }
+};
+
+const TRAIN_LINE_NAME_TO_CODE = {
+  red: 'RED',
+  blue: 'BLUE',
+  brown: 'BRN',
+  green: 'G',
+  orange: 'ORG',
+  purple: 'P',
+  pink: 'PINK',
+  yellow: 'Y'
+};
+
+const TRAIN_ROUTE_TO_CODE = {
+  Red: 'RED',
+  Blue: 'BLUE',
+  Brn: 'BRN',
+  G: 'G',
+  Org: 'ORG',
+  P: 'P',
+  Pink: 'PINK',
+  Y: 'Y'
 };
 
 export function parseKeysFile(raw) {
@@ -102,10 +124,6 @@ function toNumber(value) {
   return Number.isFinite(num) ? num : null;
 }
 
-function isTrue(value) {
-  return String(value).toUpperCase() === 'TRUE' || String(value) === '1';
-}
-
 function haversineMiles(fromLat, fromLon, toLat, toLon) {
   const toRad = (degrees) => (degrees * Math.PI) / 180;
 
@@ -122,33 +140,46 @@ function haversineMiles(fromLat, fromLon, toLat, toLon) {
   return EARTH_RADIUS_MILES * c;
 }
 
-function parseTrainLines(record) {
-  const lines = [];
+function parseStationLines(linesValue) {
+  const result = [];
+  const seenCodes = new Set();
 
-  for (const [column, meta] of Object.entries(TRAIN_LINE_META)) {
-    if (isTrue(record[column])) {
-      lines.push(meta);
+  for (const rawPart of String(linesValue ?? '').split(',')) {
+    const lineName = rawPart.trim();
+    if (!lineName) {
+      continue;
     }
+
+    const code = TRAIN_LINE_NAME_TO_CODE[lineName.toLowerCase()];
+    if (!code || seenCodes.has(code)) {
+      continue;
+    }
+
+    const meta = TRAIN_LINE_META[code];
+    if (!meta) {
+      continue;
+    }
+
+    seenCodes.add(code);
+    result.push(meta);
   }
 
-  return lines;
+  return result;
 }
 
-export function parseTrainStops(csvText) {
+export function parseTrainStations(csvText) {
   const rows = parseCsv(csvText);
 
   return rows
     .map((row) => ({
       type: 'train',
-      stopId: row.STOP_ID,
-      mapId: row.MAP_ID,
-      directionId: row.DIRECTION_ID,
-      stopName: row.STOP_NAME,
-      stationName: row.STATION_NAME,
-      displayName: row.STATION_DESCRIPTIVE_NAME || row.STATION_NAME,
+      stopId: row.STATION_ID,
+      stationId: row.STATION_ID,
+      stationName: row.LONGNAME,
+      displayName: row.LONGNAME,
       latitude: toNumber(row.latitude),
       longitude: toNumber(row.longitude),
-      lines: parseTrainLines(row)
+      lines: parseStationLines(row.LINES)
     }))
     .filter((stop) => stop.latitude !== null && stop.longitude !== null && stop.stopId);
 }
@@ -272,6 +303,15 @@ export function selectNearestTrainStopsByLineDirection(stops, limitPerLineDirect
   }
 
   return uniqueByStopId(selectedStops);
+}
+
+export function trainDisplayFromRoute(rt) {
+  const code = TRAIN_ROUTE_TO_CODE[rt];
+  const meta = code ? TRAIN_LINE_META[code] : null;
+  return {
+    code: code ?? rt,
+    name: meta?.id ?? rt
+  };
 }
 
 export function chunk(array, size) {

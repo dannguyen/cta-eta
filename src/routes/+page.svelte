@@ -7,7 +7,6 @@
     chunk,
     escapeHtml,
     formatClock,
-    formatDistance,
     formatMinutes,
     minutesUntil,
     nextPerRoute,
@@ -15,14 +14,14 @@
     parseBusStops,
     parseKeysFile,
     parseTrainApiDate,
-    parseTrainStops,
-    selectNearestBusStopsByRouteDirection,
-    selectNearestTrainStopsByLineDirection,
+    parseTrainStations,
+    trainDisplayFromRoute,
     withinRadius
   } from '$lib/cta';
 
   const SEARCH_RADIUS_MILES = 0.5;
   const SEARCH_RADIUS_METERS = SEARCH_RADIUS_MILES * 1609.344;
+  const WALK_SPEED_MPH = 4;
 
   let loading = false;
   let loadingMessage = '';
@@ -70,13 +69,24 @@
   }
 
   async function fetchTrainPredictions(stops, trainApiKey) {
+    const predictionTime = (prediction) => {
+      if (prediction.arrival instanceof Date && !Number.isNaN(prediction.arrival.getTime())) {
+        return prediction.arrival.getTime();
+      }
+
+      if (Number.isFinite(prediction.minutes)) {
+        return Date.now() + prediction.minutes * 60000;
+      }
+
+      return Number.MAX_SAFE_INTEGER;
+    };
+
     const entries = await Promise.all(
       stops.map(async (stop) => {
         const url = new URL('/api/train/api/1.0/ttarrivals.aspx', window.location.origin);
         url.searchParams.set('key', trainApiKey);
         url.searchParams.set('outputType', 'JSON');
-        url.searchParams.set('stpid', stop.stopId);
-        url.searchParams.set('max', '8');
+        url.searchParams.set('mapid', stop.stationId ?? stop.stopId);
 
         try {
           const response = await fetch(url);
@@ -89,23 +99,31 @@
           const rawEta = payload?.ctatt?.eta;
           const etaList = Array.isArray(rawEta) ? rawEta : rawEta ? [rawEta] : [];
 
-          const normalized = etaList
-            .map((eta) => {
-              const arrival = parseTrainApiDate(eta.arrT);
-              return {
-                mode: 'train',
-                route: eta.rt || 'Train',
-                direction: eta.stpDe || 'Inbound',
-                destination: eta.destNm || '',
-                arrival,
-                minutes: minutesUntil(arrival)
-              };
-            })
-            .sort((a, b) => {
-              const left = a.arrival?.getTime?.() ?? Number.MAX_SAFE_INTEGER;
-              const right = b.arrival?.getTime?.() ?? Number.MAX_SAFE_INTEGER;
-              return left - right;
-            });
+          const closestByRouteDestination = new Map();
+          for (const eta of etaList) {
+            const arrival = parseTrainApiDate(eta.arrT);
+            const displayRoute = trainDisplayFromRoute(eta.rt);
+            const destination = eta.destNm || 'Unknown destination';
+
+            const normalized = {
+              mode: 'train',
+              route: displayRoute.name || 'Train',
+              direction: `toward ${destination}`,
+              destination,
+              arrival,
+              minutes: minutesUntil(arrival)
+            };
+
+            const key = `${normalized.route}|${destination}`;
+            const existing = closestByRouteDestination.get(key);
+            if (!existing || predictionTime(normalized) < predictionTime(existing)) {
+              closestByRouteDestination.set(key, normalized);
+            }
+          }
+
+          const normalized = [...closestByRouteDestination.values()].sort(
+            (a, b) => predictionTime(a) - predictionTime(b)
+          );
 
           return [stop.stopId, normalized];
         } catch {
@@ -119,7 +137,20 @@
 
   async function fetchBusPredictions(stops, busApiKey) {
     const results = new Map(stops.map((stop) => [stop.stopId, []]));
+    const allPredictions = [];
     const stopIds = stops.map((stop) => stop.stopId);
+
+    const predictionTime = (prediction) => {
+      if (prediction.arrival instanceof Date && !Number.isNaN(prediction.arrival.getTime())) {
+        return prediction.arrival.getTime();
+      }
+
+      if (Number.isFinite(prediction.minutes)) {
+        return Date.now() + prediction.minutes * 60000;
+      }
+
+      return Number.MAX_SAFE_INTEGER;
+    };
 
     for (const idsChunk of chunk(stopIds, 10)) {
       const url = new URL('/api/bus/bustime/api/v3/getpredictions', window.location.origin);
@@ -149,32 +180,48 @@
               ? 0
               : fallbackMinutes;
 
-          const stopPredictions = results.get(prediction.stpid) ?? [];
-          stopPredictions.push({
+          const normalized = {
             mode: 'bus',
+            stopId: prediction.stpid,
             route: prediction.rt || 'Bus',
             direction: prediction.rtdir || 'Inbound',
             destination: prediction.des || '',
             arrival,
             minutes
-          });
-          results.set(prediction.stpid, stopPredictions);
+          };
+
+          allPredictions.push(normalized);
         }
       } catch {
         // A failed chunk should not block the whole app.
       }
     }
 
+    const closestByRouteDirection = new Map();
+    for (const prediction of allPredictions) {
+      const key = `${prediction.route}|${prediction.direction}`;
+      const existing = closestByRouteDirection.get(key);
+
+      if (!existing || predictionTime(prediction) < predictionTime(existing)) {
+        closestByRouteDirection.set(key, prediction);
+      }
+    }
+
+    for (const prediction of closestByRouteDirection.values()) {
+      const stopPredictions = results.get(prediction.stopId) ?? [];
+      stopPredictions.push(prediction);
+      results.set(prediction.stopId, stopPredictions);
+    }
+
     for (const [stopId, predictions] of results.entries()) {
-      predictions.sort((a, b) => {
-        const left = a.arrival?.getTime?.() ?? Number.MAX_SAFE_INTEGER;
-        const right = b.arrival?.getTime?.() ?? Number.MAX_SAFE_INTEGER;
-        return left - right;
-      });
+      predictions.sort((a, b) => predictionTime(a) - predictionTime(b));
       results.set(stopId, predictions);
     }
 
-    return results;
+    return {
+      predictionsByStop: results,
+      selectedStopIds: new Set([...closestByRouteDirection.values()].map((prediction) => prediction.stopId))
+    };
   }
 
   function markerBackground(stop) {
@@ -218,7 +265,7 @@
     }
 
     if (!stop.lines.length) {
-      return 'Train stop';
+      return 'Train station';
     }
 
     return stop.lines.map((line) => line.id).join(', ');
@@ -245,10 +292,98 @@
     return `
       <div class="popup">
         <h3>${escapeHtml(stop.displayName)}</h3>
-        <p>${escapeHtml(stop.type === 'bus' ? 'Bus stop' : 'Train stop')} • ${escapeHtml(formatDistance(stop.distanceMiles))}</p>
+        <p>${escapeHtml(stop.type === 'bus' ? 'Bus stop' : 'Train station')} • ${escapeHtml(distanceWithWalkText(stop.distanceMiles))}</p>
         <ul>${predictionMarkup}</ul>
       </div>
     `;
+  }
+
+  function destinationOrDirection(prediction) {
+    const direction = String(prediction.direction ?? '').trim();
+    const destination = String(prediction.destination ?? '').trim();
+
+    if (direction && destination) {
+      const normalizedDirection = direction.toLowerCase();
+      const normalizedDestination = destination.toLowerCase();
+      if (
+        normalizedDirection.includes(normalizedDestination) ||
+        normalizedDirection.includes('toward') ||
+        normalizedDirection.includes('to ')
+      ) {
+        return direction;
+      }
+      return `${direction} to ${destination}`;
+    }
+
+    return direction || destination || 'N/A';
+  }
+
+  function arrivalMinutesText(minutes) {
+    if (minutes === null || minutes === undefined) {
+      return 'arriving at an unknown time';
+    }
+
+    if (minutes <= 0) {
+      return 'arriving now';
+    }
+
+    if (minutes === 1) {
+      return 'arriving in 1 minute';
+    }
+
+    return `arriving in ${minutes} minutes`;
+  }
+
+  function compactClock(date) {
+    return formatClock(date).replace(/\s/g, '');
+  }
+
+  function walkingMinutesFromMiles(miles) {
+    if (!Number.isFinite(miles)) {
+      return null;
+    }
+
+    const minutes = Math.ceil((miles / WALK_SPEED_MPH) * 60);
+    return Math.max(0, minutes);
+  }
+
+  function distanceWithWalkText(miles) {
+    if (!Number.isFinite(miles)) {
+      return '';
+    }
+
+    const walkMinutes = walkingMinutesFromMiles(miles);
+    const walkText = walkMinutes === 1 ? '1 min away' : `${walkMinutes} min away`;
+    return `${miles.toFixed(2)} mi, ${walkText}`;
+  }
+
+  function hexToRgb(hexColor) {
+    const hex = String(hexColor ?? '').replace('#', '');
+    if (!/^[0-9a-fA-F]{6}$/.test(hex)) {
+      return null;
+    }
+    return {
+      r: Number.parseInt(hex.slice(0, 2), 16),
+      g: Number.parseInt(hex.slice(2, 4), 16),
+      b: Number.parseInt(hex.slice(4, 6), 16)
+    };
+  }
+
+  function trainBadgeStyle(routeName) {
+    const lineMeta = Object.values(TRAIN_LINE_META).find(
+      (line) => line.id.toLowerCase() === String(routeName ?? '').toLowerCase()
+    );
+
+    if (!lineMeta) {
+      return '';
+    }
+
+    const rgb = hexToRgb(lineMeta.color);
+    if (!rgb) {
+      return '';
+    }
+
+    return `background-color: rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.16); border-color: rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.5);`;
   }
 
   async function ensureLeaflet() {
@@ -342,41 +477,43 @@
 
       loadingMessage = 'Loading CTA stop datasets...';
       const [trainCsv, busCsv] = await Promise.all([
-        fetchText('/data/cta-train-stops.csv'),
+        fetchText('/data/cta-train-stations.csv'),
         fetchText('/data/cta-bus-stops.csv')
       ]);
       if (currentNonce !== loadNonce) {
         return;
       }
 
-      const nearbyTrainStops = withinRadius(
-        parseTrainStops(trainCsv),
+      const nearbyTrainStations = withinRadius(
+        parseTrainStations(trainCsv),
         userLocation,
         SEARCH_RADIUS_MILES
       );
-      const filteredTrainStops = selectNearestTrainStopsByLineDirection(nearbyTrainStops, 2);
 
       const nearbyBusStops = withinRadius(parseBusStops(busCsv), userLocation, SEARCH_RADIUS_MILES);
-      const filteredBusStops = selectNearestBusStopsByRouteDirection(nearbyBusStops);
+      const candidateBusStops = nearbyBusStops.slice(0, 10);
 
       loadingMessage = 'Loading train and bus ETAs...';
-      const [trainPredictions, busPredictions] = await Promise.all([
-        fetchTrainPredictions(filteredTrainStops, keys.train),
-        fetchBusPredictions(filteredBusStops, keys.bus)
+      const [trainPredictions, busData] = await Promise.all([
+        fetchTrainPredictions(nearbyTrainStations, keys.train),
+        fetchBusPredictions(candidateBusStops, keys.bus)
       ]);
       if (currentNonce !== loadNonce) {
         return;
       }
 
-      const enrichedTrainStops = filteredTrainStops.map((stop) => ({
+      const enrichedTrainStops = nearbyTrainStations.map((stop) => ({
         ...stop,
         predictions: trainPredictions.get(stop.stopId) ?? []
       }));
 
-      const enrichedBusStops = filteredBusStops.map((stop) => ({
-        ...stop,
-        predictions: busPredictions.get(stop.stopId) ?? []
-      }));
+      const enrichedBusStops = candidateBusStops
+        .filter((stop) => busData.selectedStopIds.has(stop.stopId))
+        .map((stop) => ({
+          ...stop,
+          predictions: busData.predictionsByStop.get(stop.stopId) ?? []
+        }))
+        .filter((stop) => stop.predictions.length > 0);
 
       nearbyStops = [...enrichedTrainStops, ...enrichedBusStops].sort(
         (a, b) => a.distanceMiles - b.distanceMiles
@@ -429,6 +566,23 @@
       .filter((line) => visibleTrainLineCodes.has(line.code))
       .map((line) => ({ label: line.id, color: line.color }))
   ];
+
+  $: upcomingArrivals = nearbyStops
+    .flatMap((stop) =>
+      (stop.predictions ?? []).map((prediction) => ({
+        etaTime: compactClock(prediction.arrival),
+        type: stop.type,
+        routeLabel: stop.type === 'train' ? `${prediction.route} Line` : String(prediction.route),
+        typeLabel: stop.type === 'train' ? 'Train' : 'Bus',
+        routeBadgeStyle: stop.type === 'train' ? trainBadgeStyle(prediction.route) : '',
+        destinationDirection: destinationOrDirection(prediction),
+        stopName: stop.displayName,
+        distance: distanceWithWalkText(stop.distanceMiles),
+        etaMinutesText: arrivalMinutesText(prediction.minutes),
+        sortTime: prediction.arrival?.getTime?.() ?? Number.MAX_SAFE_INTEGER
+      }))
+    )
+    .sort((a, b) => a.sortTime - b.sortTime);
 </script>
 
 <svelte:head>
@@ -480,42 +634,30 @@
   {/if}
 
   <section>
-    <h2>Nearest Stops</h2>
+    <h2>Upcoming Arrivals</h2>
 
     {#if !loading && !errorMessage && nearbyStops.length === 0}
       <p class="empty">No CTA stops found in the default 0.5-mile radius.</p>
+    {:else if !loading && !errorMessage && upcomingArrivals.length === 0}
+      <p class="empty">No live arrivals available right now.</p>
+    {:else if upcomingArrivals.length > 0}
+      <ul class="arrival-list">
+        {#each upcomingArrivals as item}
+          <li class="arrival-item">
+            <span class="arrival-line">
+              <span class="arrival-emoji">{item.type === 'train' ? '🚆' : '🚌'}</span>
+              <strong class="arrival-time">{item.etaTime}</strong>:
+              <span class={`route-line ${item.type}`} style={item.routeBadgeStyle}>{item.routeLabel}</span>
+              <span class="type-label">{item.typeLabel}</span>
+              <span class="arrival-emphasis">({item.destinationDirection})</span>
+              <span class="eta-minutes">{item.etaMinutesText}</span>
+              at <span class="stop-name">{item.stopName}</span>
+              <span class="distance">({item.distance})</span>
+            </span>
+          </li>
+        {/each}
+      </ul>
     {/if}
-
-    <div class="stop-list">
-      {#each nearbyStops as stop}
-        <article class="stop-card">
-          <div class="stop-title-row">
-            <span class="dot marker" style={`background:${markerBackground(stop)}`}></span>
-            <div>
-              <h3>{stop.displayName}</h3>
-              <p>{stopLinesLabel(stop)} • {formatDistance(stop.distanceMiles)}</p>
-            </div>
-          </div>
-
-          {#if nextPerRoute(stop.predictions).length === 0}
-            <p class="empty">No live predictions at this stop right now.</p>
-          {:else}
-            <ul>
-              {#each nextPerRoute(stop.predictions) as prediction}
-                <li>
-                  <strong>{prediction.route}</strong>
-                  {prediction.direction}
-                  {#if prediction.destination}
-                    to {prediction.destination}
-                  {/if}
-                  <span>{formatMinutes(prediction.minutes)} ({formatClock(prediction.arrival)})</span>
-                </li>
-              {/each}
-            </ul>
-          {/if}
-        </article>
-      {/each}
-    </div>
   </section>
 </main>
 
@@ -660,68 +802,80 @@
     flex-shrink: 0;
   }
 
-  .dot.marker {
-    width: 12px;
-    height: 12px;
-    border: 1px solid #ffffff;
-    box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.2);
-  }
-
   section h2 {
     margin: 18px 0 10px;
     font-size: 1.1rem;
   }
 
-  .stop-list {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(270px, 1fr));
-    gap: 12px;
-    margin-bottom: 28px;
-  }
-
-  .stop-card {
+  .arrival-list {
+    list-style: none;
+    margin: 0 0 28px;
+    padding: 0;
     background: #fff;
     border: 1px solid #dde5f0;
-    border-radius: 12px;
-    padding: 12px;
-    box-shadow: 0 4px 14px rgba(15, 23, 42, 0.06);
+    border-radius: 10px;
+    overflow: hidden;
   }
 
-  .stop-title-row {
-    display: flex;
-    gap: 8px;
-    align-items: flex-start;
-  }
-
-  .stop-title-row h3 {
-    margin: 0;
-    font-size: 1rem;
-  }
-
-  .stop-title-row p {
-    margin: 2px 0 0;
-    color: #4f5b6b;
-    font-size: 0.86rem;
-  }
-
-  .stop-card ul {
-    margin: 10px 0 0;
-    padding: 0;
-    list-style: none;
-  }
-
-  .stop-card li {
+  .arrival-item {
+    padding: 7px 10px;
     border-top: 1px solid #edf1f8;
-    padding: 7px 0;
     font-size: 0.88rem;
-    display: flex;
-    justify-content: space-between;
-    gap: 10px;
+    line-height: 1.25;
   }
 
-  .stop-card li span {
+  .arrival-item:first-child {
+    border-top: 0;
+  }
+
+  .arrival-emoji {
+    margin-right: 6px;
+  }
+
+  .arrival-time {
+    font-weight: 700;
+  }
+
+  .route-line {
+    display: inline-block;
+    margin: 0 2px;
+    padding: 1px 6px;
+    border-radius: 999px;
+    border: 1px solid #d8e0eb;
+    background: #f8fafc;
+    font-weight: 700;
+  }
+
+  .route-line.train {
+    border-color: #d8e0eb;
+  }
+
+  .route-line.bus {
+    color: #1f2937;
+  }
+
+  .type-label {
+    font-weight: 500;
     color: #334155;
-    white-space: nowrap;
+  }
+
+  .arrival-emphasis {
+    font-weight: 600;
+    color: #334155;
+  }
+
+  .eta-minutes {
+    font-weight: 700;
+  }
+
+  .stop-name {
+    font-weight: 700;
+    color: #0f172a;
+  }
+
+  .distance {
+    color: #475569;
+    font-weight: 600;
   }
 
   .empty {
@@ -740,8 +894,10 @@
       border-radius: 12px;
     }
 
-    .stop-list {
-      grid-template-columns: 1fr;
+    .arrival-item {
+      padding: 6px 8px;
+      font-size: 0.84rem;
+      line-height: 1.2;
     }
   }
 </style>
