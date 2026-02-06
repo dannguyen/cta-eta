@@ -1,0 +1,27 @@
+drafts
+keys.toml
+static/database.sqlite
+TODOS.md
+## claude
+node_modules
+_devnotes
+/test-results
+# Output
+.output
+.vercel
+/.svelte-kit
+/build
+/dist
+# OS
+.DS_Store
+Thumbs.db
+*.sqlite
+# Env
+.env
+.env.*
+!.env.example
+!.env.test
+
+# Vite
+vite.config.js.timestamp-*
+vite.config.ts.timestamp-*
