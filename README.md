@@ -4,6 +4,34 @@
 
 Make a one-page static web app that reads the visitor's current geospatial location that uses Chicago Transit Authority (CTA) data APIs to find the nearest Chicago transit bus stops and rail stations, and then lists the estimated arrival times (in either direction) for each stop.
 
+### Technical requirements
+
+- Use Svelte 5.0
+- The app should be a static single page app, as it relies on static data files (in static/data) or calling APIs
+
+### Detailed flow description
+
+- User visits the CTA ETA Webapp page
+- Webapp requests permission to get user geospatial location
+- Using the user's coordinates, the webapp then reads the following static data files of stop locations:
+    - read bus stop data [static/data/cta-bus-stops.csv](static/data/cta-bus-stops.csv)
+        - find all bus stops within 0.5 miles of the user
+        - gather all the unique route numbers that pass through these stops (the `ROUTESSTPG` column contains a comma delimited list of route numbers for that stop), for each direction (column `DIR`)
+        - for each route number and route direction, find the nearest stop to the user
+            - this is so we don't return a list of every Route 36 bus stop within a 0.5 radius from the user, just the nearest northbound and southbound Route 36 bus stops
+    - read train stop data from [static/data/cta-train-stops.csv](static/data/cta-train-stops.csv)
+        - for each unique train line and direction (`DIRECTION_ID`), find the *two* nearest train stops to the user
+
+- Now that you've gathered stop IDs from these files (`STOP_ID`), use them to call the respective CTA APIs:
+    - Iterating through each train stop STOP_ID, call the [Train Tracker Arrivals API](#mark-train-tracker-arrivals-api) and find the closest train and its ETA data
+    - Iterating through each bus stop STOP_ID, call the [Bus Get Predictions API](#mark-bus-get-predictions-api) (the `stpid` parameter can take more than one stop id), and find the nearest arriving buses for each stop
+
+- Render the bus and train stops on a Leaflet OpenStreetMap
+    - attach click eventhandlers that show the ETAs for each clicked stop
+- Render a text list of the bus and train stops, with the ETAs of arriving trains/buses
+
+
+### Mapping
 The web app should also use a Leaflet + Openstreet map to show the user's current location and the locations of the nearest stops.
 
 For the map icons:
@@ -15,26 +43,6 @@ For the map icons:
 Below the map should be a simple list of the nearest stops, along with the closest ETAs for the closest trains/buses per route/line at each stop.
 
 By default, the app should find the stops within a half-mile radius of the user's location.
-
-## Technical requirements
-
-- Use Svelte 5.0
-- The app should be a static single page app, as it relies on static data files (in static/data) or calling APIs
-
-## Detailed flow description
-
-- User visits the CTA ETA Webapp page
-- Webapp requests permission to get user geospatial location
-- Using the user's coordinates, finds all train and bus stops within a 0.5 mile radius from the user:
-    - read [static/data/cta-bus-stops.csv](static/data/cta-bus-stops.csv)
-    - read [static/data/cta-train-stops.csv](static/data/cta-train-stops.csv)
-    - both of these files contain columns STOP_ID, longitude, and latitude
-- Iterating through each train stop STOP_ID, call the [Train Tracker Arrivals API](#mark-train-tracker-arrivals-api) and find the closest train and its ETA data
-- Iterating through each bus stop STOP_ID, call the [Bus Get Predictions API](#mark-bus-get-predictions-api) (the `stpid` parameter can take more than one stop id), and find the nearest arriving buses for each stop
-- Render the bus and train stops on a Leaflet OpenStreetMap
-    - attach click eventhandlers that show the ETAs for each clicked stop
-- Render a text list of the bus and train stops, with the ETAs of arriving trains/buses
-
 
 
 
