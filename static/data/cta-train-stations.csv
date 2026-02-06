@@ -1,0 +1,146 @@
+latitude,longitude,STATION_ID,LONGNAME,LINES,ADDRESS,ADA,PKNRD,POINT_X,POINT_Y,LEGEND
+41.8716,-87.74517,40970,Cicero-Congress,Blue,720 S. Cicero Avenue,FALSE,FALSE,"1,144,440.98","1,896,352.79",Blue Line
+41.88684,-87.80317,40020,Harlem-Lake,Green,1 S. Harlem Avenue,TRUE,FALSE,"1,128,608.76","1,901,803.40",Green Line
+41.88715,-87.78366,40610,Ridgeland,Green,36 N. Ridgeland Avenue,FALSE,FALSE,"1,133,921.86","1,901,950.19",Green Line
+41.98429,-87.83802,40230,Cumberland,Blue,5800 N. Cumberland Avenue,TRUE,TRUE,"1,118,914.13","1,937,256.05",Blue Line
+41.88322,-87.62618,41700,Washington/Wabash,"Brown,Orange,Pink,Purple,Green",29 N. Wabash,TRUE,FALSE,"1,176,812.48","1,900,828.69",Multiple Lines
+41.87556,-87.63172,41340,LaSalle,Blue,150 W. Congress Parkway,FALSE,FALSE,"1,175,328.50","1,898,027.80",Blue Line
+41.89118,-87.64757,40490,Grand/Milwaukee,Blue,502 N. Milwaukee Avenue,FALSE,FALSE,"1,170,964.66","1,903,685.42",Blue Line
+42.06398,-87.68561,41250,Central-Evanston,Purple,1022 W. Central Avenue,FALSE,FALSE,"1,160,131.39","1,966,573.10",Multiple Lines
+41.96148,-87.74361,41330,Montrose-O'Hare,Blue,4600 W. Montrose Avenue,FALSE,FALSE,"1,144,639.35","1,929,107.51",Blue Line
+41.82181,-87.62146,40300,Indiana,Green,4003 S. Indiana Avenue,TRUE,FALSE,"1,178,284.91","1,878,463.56",Green Line
+41.79541,-87.63116,41170,Garfield-Dan Ryan,Red,220 W. Garfield Boulevard,TRUE,FALSE,"1,175,717.82","1,868,822.89",Red Line
+41.88432,-87.70615,41070,Kedzie-Lake,Green,3200 W. Lake Street,TRUE,FALSE,"1,155,033.73","1,901,060.63",Green Line
+41.75041,-87.62517,40240,79th,Red,15 W. 79th Street,TRUE,FALSE,"1,177,486.46","1,852,436.47",Red Line
+41.91065,-87.64917,40650,North/Clybourn,Red,1599 N. Clybourn Avenue,FALSE,FALSE,"1,170,472.73","1,910,775.10",Red Line
+41.81033,-87.63102,41230,47th-Dan Ryan,Red,220 W. 47th Street,TRUE,FALSE,"1,175,712.49","1,874,259.92",Red Line
+42.04771,-87.68354,40050,Davis,Purple,1612 N. Benson Avenue,TRUE,FALSE,"1,160,739.72","1,960,646.08",Multiple Lines
+41.94702,-87.67473,41440,Addison-Ravenswood,Brown,1818 W. Addison Street,TRUE,FALSE,"1,163,413.94","1,923,975.43",Brown Line
+41.85427,-87.69482,40440,California-Douglas,Pink,2011 S. California Avenue,TRUE,FALSE,"1,158,201.07","1,890,136.34",Pink Line
+41.88573,-87.63088,40380,Clark/Lake,"Brown,Orange,Pink,Purple,Green,Blue",100 W. Lake,TRUE,FALSE,"1,175,525.86","1,901,735.37",Multiple Lines
+41.8848,-87.62781,41660,Lake/State,Red,188 N. State,TRUE,FALSE,"1,176,365.32","1,901,404.02",Red Line
+42.03345,-87.67953,40270,Main,Purple,836 N. Chicago Avenue,FALSE,FALSE,"1,161,867.22","1,955,459.94",Multiple Lines
+41.87388,-87.72562,40920,Pulaski-Congress,Blue,530 S. Pulaski Road,FALSE,FALSE,"1,149,758.98","1,897,220.95",Blue Line
+41.95294,-87.72917,40550,Irving Park-O'Hare,Blue,4131 W. Irving Park Road,FALSE,FALSE,"1,148,588.59","1,926,020.54",Blue Line
+41.8579,-87.66916,40830,18th,Pink,1710 W. 18th Street,TRUE,FALSE,"1,165,182.26","1,891,511.43",Pink Line
+41.78012,-87.61554,41140,King Drive,Green,400 E. 63rd Street,TRUE,FALSE,"1,180,024.55","1,863,287.02",Green Line
+41.79517,-87.61832,40510,Garfield-South Elevated,Green,320 E. Garfield Boulevard,TRUE,TRUE,"1,179,221.20","1,868,763.72",Green Line
+42.05416,-87.68356,40520,Foster,Purple,900 W. Foster Street,FALSE,FALSE,"1,160,717.14","1,962,996.53",Multiple Lines
+41.85192,-87.74534,40420,Cicero-Douglas,Pink,2133 S. 48th Court,TRUE,FALSE,"1,144,443.84","1,889,179.92",Pink Line
+41.97345,-87.65852,41200,Argyle,Red,1118 W. Argyle Street,FALSE,FALSE,"1,167,746.83","1,933,638.98",Red Line
+41.88896,-87.63397,40460,Merchandise Mart,"Brown,Purple",350 N. Wells Street,TRUE,FALSE,"1,174,675.58","1,902,905.86",Multiple Lines
+41.89667,-87.62817,41450,Chicago/State,Red,800 N. State Street,TRUE,FALSE,"1,176,230.96","1,905,725.85",Red Line
+41.88269,-87.63385,40730,Washington/Wells,"Brown,Orange,Pink,Purple",100 N. Wells Street,TRUE,FALSE,"1,174,726.84","1,900,620.27",Multiple Lines
+41.96425,-87.65773,40540,Wilson,"Purple,Red",4920 N. Broadway Street,TRUE,FALSE,"1,168,029.49","1,930,295.53",Multiple Lines
+41.88698,-87.79378,41350,Oak Park-Lake,Green,100 S. Oak Park Avenue,FALSE,FALSE,"1,131,166.01","1,901,870.07",Green Line
+41.78661,-87.73795,40930,Midway Airport,Orange,4612 W. 59th Street,TRUE,TRUE,"1,146,620.92","1,865,394.75",Orange Line
+41.89607,-87.65521,41410,Chicago/Milwaukee,Blue,800 N. Milwaukee Avenue,FALSE,FALSE,"1,168,871.48","1,905,449.33",Blue Line
+41.87872,-87.63373,40040,Quincy/Wells,"Brown,Orange,Pink,Purple",220 S. Wells Street,TRUE,FALSE,"1,174,769.56","1,899,173.23",Multiple Lines
+41.91821,-87.65264,40660,Armitage,"Brown,Purple",944 W. Armitage Avenue,TRUE,FALSE,"1,169,507.15","1,913,523.19",Multiple Lines
+41.88557,-87.65212,41510,Morgan,"Green,Pink",1000 W Lake St,TRUE,FALSE,"1,169,742.12","1,901,630.36",Multiple Lines
+41.88716,-87.75498,40700,Laramie,Green,5148 W. Lake Street,TRUE,FALSE,"1,141,729.75","1,902,002.90",Green Line
+41.7803,-87.60585,40720,Cottage Grove,Green,800 E. 63rd Street,TRUE,FALSE,"1,182,666.52","1,863,374.48",Green Line
+42.00107,-87.66106,41300,Loyola,Red,1200 W. Loyola Avenue,TRUE,FALSE,"1,166,979.65","1,943,698.47",Red Line
+41.8769,-87.6282,40850,Library,"Brown,Orange,Pink,Purple",26 W. Van Buren Street,TRUE,FALSE,"1,176,281.21","1,898,524.19",Multiple Lines
+41.87403,-87.62747,41490,Harrison,Red,608 S. State Street,FALSE,FALSE,"1,176,488.62","1,897,480.33",Red Line
+41.9835,-87.85938,40820,Rosemont,Blue,5801 N. River Road,TRUE,TRUE,"1,113,107.88","1,936,936.48",Blue Line
+41.8674,-87.62658,40410,Roosevelt/Wabash,"Orange,Green",22 E. Roosevelt Road,TRUE,FALSE,"1,176,750.71","1,895,064.80",Multiple Lines
+41.9662,-87.69411,41010,Rockwell,Brown,4648 N. Rockwell Street,TRUE,FALSE,"1,158,091.02","1,930,925.26",Brown Line
+41.87588,-87.65945,40470,Racine,Blue,430 S. Racine Avenue,FALSE,FALSE,"1,167,774.56","1,898,083.16",Blue Line
+41.87442,-87.70597,40250,Kedzie-Homan,Blue,530 S. Kedzie Avenue,TRUE,FALSE,"1,155,108.32","1,897,455.05",Blue Line
+41.93813,-87.71235,40060,Belmont-O'Hare,Blue,3355 W. Belmont Avenue,FALSE,FALSE,"1,153,202.40","1,920,656.95",Blue Line
+42.04165,-87.6816,40690,Dempster,Purple,1316 N. Sherman Avenue,FALSE,FALSE,"1,161,283.71","1,958,443.43",Multiple Lines
+41.78053,-87.631,40910,63rd-Dan Ryan,Red,220 W. 63rd Street,TRUE,FALSE,"1,175,808.13","1,863,399.66",Red Line
+41.87156,-87.66954,41030,Polk,Pink,1713 W. Polk Street,TRUE,FALSE,"1,165,039.42","1,896,486.59",Pink Line
+41.94742,-87.65362,41420,Addison-North Main,Red,940 W. Addison Street,TRUE,FALSE,"1,169,155.60","1,924,165.79",Red Line
+41.8469,-87.64813,41130,Halsted-Midway,Orange,2520 S. Archer Avenue,TRUE,TRUE,"1,170,942.97","1,887,545.80",Orange Line
+41.79988,-87.72444,40960,Pulaski-Midway,Orange,5106 S. Pulaski Road,TRUE,TRUE,"1,150,270.22","1,870,257.60",Orange Line
+41.96614,-87.70165,40870,Francisco,Brown,4648 N. Francisco Avenue,TRUE,FALSE,"1,156,039.37","1,930,887.06",Brown Line
+42.02761,-87.67832,40840,South Boulevard,Purple,601 W. South Boulevard,FALSE,FALSE,"1,162,211.83","1,953,332.90",Multiple Lines
+41.97798,-87.65866,40340,Berwyn,Red,1121 W. Berwyn Avenue,FALSE,FALSE,"1,167,696.18","1,935,289.68",Red Line
+41.94381,-87.6636,40360,Southport,Brown,3411 N. Southport Avenue,TRUE,FALSE,"1,166,449.96","1,922,826.82",Brown Line
+41.80209,-87.6185,40130,51st,Green,314 E. 51st Street,TRUE,FALSE,"1,179,151.84","1,871,283.08",Green Line
+42.07315,-87.69072,41050,Linden,Purple,349 W. Linden Avenue,TRUE,TRUE,"1,158,718.09","1,969,902.90",Multiple Lines
+41.94736,-87.71909,41240,Addison-O'Hare,Blue,3622 W. Addison Street,TRUE,FALSE,"1,151,344.51","1,924,006.60",Blue Line
+41.88729,-87.77413,41260,Austin-Lake,Green,351 N. Austin Blvd,FALSE,FALSE,"1,136,515.35","1,902,015.56",Green Line
+41.8092,-87.61882,41080,47th-South Elevated,Green,314 E. 47th Street,TRUE,FALSE,"1,179,041.80","1,873,875.83",Green Line
+41.97887,-87.90184,40890,O'Hare Airport,Blue,1000 O'Hare Drive,TRUE,FALSE,"1,101,572.00","1,935,188.08",Blue Line
+41.83167,-87.62588,41120,35-Bronzeville-IIT,Green,16 E. 35th Street,TRUE,FALSE,"1,177,050.92","1,882,047.59",Green Line
+41.95452,-87.67495,41460,Irving Park-Ravenswood,Brown,1816 W. Irving Park Dr,TRUE,FALSE,"1,163,333.21","1,926,705.99",Brown Line
+41.96175,-87.67516,41500,Montrose-Ravenswood,Brown,1814 W. Montrose Avenue,TRUE,FALSE,"1,163,255.95","1,929,339.67",Brown Line
+41.97063,-87.76089,41280,Jefferson Park,Blue,4917 N. Milwaukee Avenue,TRUE,FALSE,"1,139,918.57","1,932,409.03",Blue Line
+41.93273,-87.65313,40530,Diversey,"Brown,Purple",940 W. Diversey Avenue,TRUE,FALSE,"1,169,332.77","1,918,811.41",Multiple Lines
+41.8807,-87.62937,40790,Monroe/Dearborn,Blue,114 S. Dearborn,FALSE,FALSE,"1,175,951.62","1,899,904.52",Blue Line
+41.88738,-87.76564,40280,Central-Lake,Green,350 N. Central Avenue,TRUE,FALSE,"1,138,825.74","1,902,065.79",Green Line
+41.8532,-87.63096,41000,Cermak-Chinatown,Red,138 W. Cermak Road,TRUE,FALSE,"1,175,600.58","1,889,880.87",Red Line
+41.92972,-87.70854,41020,Logan Square,Blue,2620 N. Milwaukee Av,TRUE,FALSE,"1,154,263.50","1,917,602.20",Blue Line
+41.96625,-87.6885,41480,Western-Ravenswood,Brown,4645 N. Western Avenue,TRUE,FALSE,"1,159,616.20","1,930,951.30",Brown Line
+41.88316,-87.62944,40370,Washington/Dearborn,Blue,19 N. Dearborn,FALSE,FALSE,"1,175,927.28","1,900,801.15",Blue Line
+41.88496,-87.67688,41710,Damen-Lake,Green,154 N. Damen Ave,TRUE,FALSE,"1,163,002.26","1,901,355.32",Green Line
+41.93603,-87.65326,41210,Wellington,"Brown,Purple",945 W. Wellington Avenue,TRUE,FALSE,"1,169,286.34","1,920,014.05",Multiple Lines
+42.02624,-87.74722,41680,Oakton-Skokie,Yellow,4802 W Oakton,TRUE,FALSE,"1,143,497.61","1,952,698.68",Yellow Line
+41.87551,-87.64964,40350,UIC-Halsted,Blue,430 S. Halsted Street,TRUE,FALSE,"1,170,448.20","1,897,969.68",Blue Line
+41.85399,-87.71488,40780,Central Park,Pink,1915 S. Central Park Avenue,TRUE,FALSE,"1,152,737.53","1,889,991.52",Pink Line
+41.83935,-87.66531,41060,Ashland-Midway,Orange,3011 S. Ashland Avenue,TRUE,FALSE,"1,166,283.24","1,884,759.34",Orange Line
+41.90974,-87.67743,40590,Damen/Milwaukee,Blue,1558 N. Damen Avenue,FALSE,FALSE,"1,162,783.21","1,910,383.12",Blue Line
+42.05828,-87.68333,40400,Noyes,Purple,901 W. Noyes Street,FALSE,FALSE,"1,160,766.40","1,964,499.18",Multiple Lines
+41.87425,-87.81731,40390,Forest Park,Blue,711 S. Des Plaines Avenue,TRUE,TRUE,"1,124,785.61","1,897,191.79",Blue Line
+41.88421,-87.69623,41360,California-Lake,Green,2800 W. Lake Street,TRUE,FALSE,"1,157,735.62","1,901,043.52",Green Line
+41.72237,-87.62441,40450,95th/Dan Ryan,Red,14 W. 95th Street,TRUE,FALSE,"1,177,778.98","1,842,222.01",Red Line
+41.9104,-87.6393,40800,Sedgwick,"Brown,Purple",1536 N. Sedgwick Avenue,TRUE,FALSE,"1,173,161.41","1,910,707.27",Multiple Lines
+41.87563,-87.67394,40810,Illinois Medical District,Blue,430 S. Damen Avenue,TRUE,FALSE,"1,163,828.91","1,897,961.33",Blue Line
+41.82956,-87.68058,40120,35th/Archer,Orange,3528 S. Leavitt Street,TRUE,TRUE,"1,162,147.78","1,881,157.79",Orange Line
+42.01587,-87.66909,41190,Jarvis,Red,1523 W. Jarvis Street,FALSE,FALSE,"1,164,754.77","1,949,075.68",Red Line
+41.87951,-87.62609,40680,Adams/Wabash,"Brown,Orange,Pink,Purple,Green",201 S. Wabash Avenue,FALSE,FALSE,"1,176,848.37","1,899,477.05",Multiple Lines
+41.88531,-87.66695,40170,Ashland-Lake,"Green,Pink",1601 W. Lake Street,TRUE,FALSE,"1,165,706.56","1,901,501.96",Multiple Lines
+41.85439,-87.68517,40740,Western-Douglas,Pink,2009 S. Western Avenue,TRUE,FALSE,"1,160,828.02","1,890,198.73",Pink Line
+41.96913,-87.65849,40770,Lawrence,Red,1117 W. Lawrence Avenue,FALSE,FALSE,"1,167,769.27","1,932,066.88",Red Line
+41.85177,-87.75669,40580,54th/Cermak,Pink,2134 S. 54th Avenue,TRUE,TRUE,"1,141,351.98","1,889,103.78",Pink Line
+41.95377,-87.65492,40080,Sheridan,Red,3940 N. Sheridan Road,FALSE,FALSE,"1,168,782.70","1,926,475.83",Red Line
+41.99025,-87.65907,40880,Thorndale,Red,1118 W. Thorndale Avenue,FALSE,FALSE,"1,167,550.17","1,939,762.07",Red Line
+41.96609,-87.70884,41180,Kedzie-Ravenswood,Brown,4648 N. Kedzie Avenue,TRUE,FALSE,"1,154,084.66","1,930,852.95",Brown Line
+41.87685,-87.63173,40160,LaSalle/Van Buren,"Brown,Orange,Pink,Purple",121 W. Van Buren Street,FALSE,FALSE,"1,175,321.46","1,898,497.01",Multiple Lines
+41.87349,-87.80696,40980,Harlem-Congress,Blue,701 S. Harlem Avenue,FALSE,FALSE,"1,127,608.01","1,896,929.33",Blue Line
+41.92505,-87.65286,41220,Fullerton,"Red,Brown,Purple",943  W. Fullerton Avenue,TRUE,FALSE,"1,169,427.10","1,916,013.33",Multiple Lines
+41.87552,-87.68843,40220,Western-Congress,Blue,430 S. Western Avenue,FALSE,FALSE,"1,159,883.32","1,897,892.78",Blue Line
+41.96641,-87.67863,40090,Damen-Ravenswood,Brown,4643 N. Damen Avenue,TRUE,FALSE,"1,162,299.35","1,931,030.29",Brown Line
+41.90392,-87.63141,40630,Clark/Division,Red,1200 N. Clark Street,TRUE,FALSE,"1,175,328.35","1,908,360.20",Red Line
+41.77895,-87.66384,40290,Ashland/63rd,Green,6315 S. Ashland Avenue,TRUE,TRUE,"1,166,854.41","1,862,752.12",Green Line
+41.89677,-87.63594,40710,Chicago/Franklin,"Brown,Purple",300 W. Chicago Avenue,TRUE,FALSE,"1,174,115.15","1,905,746.08",Multiple Lines
+41.76836,-87.6258,40990,69th,Red,15 W. 69th Street,TRUE,FALSE,"1,177,260.46","1,858,977.89",Red Line
+41.86736,-87.6274,41400,Roosevelt/State,Red,1167 S. State Street,TRUE,FALSE,"1,176,529.51","1,895,049.39",Red Line
+42.00836,-87.6659,40100,Morse,Red,1358 W. Morse Avenue,FALSE,FALSE,"1,165,641.10","1,946,344.12",Red Line
+41.88074,-87.62769,41090,Monroe/State,Red,26 S. State,FALSE,FALSE,"1,176,409.34","1,899,923.25",Red Line
+41.85311,-87.6264,41690,Cermak-McCormick Place,Green,12 E. Cermak Rd.,TRUE,FALSE,"1,176,844.65","1,889,858.02",Green Line
+41.91615,-87.68736,40670,Western/Milwaukee,Blue,1909 N. Western Avenue,TRUE,FALSE,"1,160,063.30","1,912,699.75",Blue Line
+42.01906,-87.67289,40900,Howard,"Red,Yellow,Purple",1649 W. Howard Street,TRUE,TRUE,"1,163,713.08","1,950,229.07",Multiple Lines
+41.83119,-87.63063,40190,Sox-35th-Dan Ryan,Red,142 W. 35th Street,TRUE,FALSE,"1,175,756.54","1,881,859.32",Red Line
+41.81646,-87.61903,41270,43rd,Green,314 E. 43rd Street,TRUE,FALSE,"1,178,962.67","1,876,518.82",Green Line
+41.87553,-87.64098,40430,Clinton-Congress,Blue,426 S. Clinton Street,FALSE,FALSE,"1,172,806.09","1,897,996.85",Blue Line
+41.90335,-87.66649,40320,Division/Milwaukee,Blue,1200 N. Milwaukee Avenue,FALSE,FALSE,"1,165,779.32","1,908,078.04",Blue Line
+41.73537,-87.62475,41430,87th,Red,15 W. 87th Street,TRUE,FALSE,"1,177,647.64","1,846,956.57",Red Line
+41.92193,-87.69688,40570,California/Milwaukee,Blue,2211 N. California Avenue,FALSE,FALSE,"1,157,455.12","1,914,787.24",Blue Line
+41.80434,-87.70432,41150,Kedzie-Midway,Orange,4900 S. Kedzie Avenue,TRUE,TRUE,"1,155,746.79","1,871,922.53",Orange Line
+41.88541,-87.7254,40030,Pulaski-Lake,Green,4000 W. Lake Street,TRUE,FALSE,"1,149,789.47","1,901,420.43",Green Line
+41.88651,-87.74469,40480,Cicero-Lake,Green,4800 W. Lake Street,TRUE,FALSE,"1,144,532.75","1,901,787.33",Green Line
+41.85385,-87.72432,40150,Pulaski-Douglas,Pink,2005 S. Pulaski Road,TRUE,FALSE,"1,150,164.33","1,889,923.88",Pink Line
+41.93975,-87.65338,41320,Belmont-North Main,"Red,Brown,Purple",945 W. Belmont Avenue,TRUE,FALSE,"1,169,244.56","1,921,368.70",Multiple Lines
+41.77902,-87.64402,40940,Halsted/63rd,Green,6321 S. Halsted Street,TRUE,FALSE,"1,172,260.64","1,862,821.97",Green Line
+42.03895,-87.75191,40140,Dempster-Skokie,Yellow,5001 W. Dempster Street,TRUE,TRUE,"1,142,189.80","1,957,320.43",Yellow Line
+41.88574,-87.62783,40260,State/Lake,"Brown,Orange,Pink,Purple,Green",200 N. State Street,FALSE,FALSE,"1,176,356.59","1,901,743.43",Multiple Lines
+41.80468,-87.68406,40310,Western-Midway,Orange,4901 S. Western Avenue,TRUE,TRUE,"1,161,268.49","1,872,085.73",Orange Line
+41.8857,-87.64177,41160,Clinton-Lake,"Green,Pink",540 W. Lake Street,TRUE,FALSE,"1,172,561.89","1,901,699.06",Multiple Lines
+41.87818,-87.62929,40070,Jackson/Dearborn,Blue,328 S. Dearborn,TRUE,FALSE,"1,175,981.50","1,898,986.07",Blue Line
+41.87815,-87.62759,40560,Jackson/State,Red,230 S. State,TRUE,FALSE,"1,176,444.43","1,898,979.03",Red Line
+41.85451,-87.67597,40210,Damen,Pink,2010 S. Damen Avenue,TRUE,FALSE,"1,163,335.48","1,890,260.80",Pink Line
+41.8721,-87.7916,40180,Oak Park-Congress,Blue,950 S. Oak Park Avenue,FALSE,FALSE,"1,131,794.16","1,896,451.73",Blue Line
+41.9835,-87.65884,41380,Bryn Mawr,Red,1119 W. Bryn Mawr Avenue,FALSE,FALSE,"1,167,633.60","1,937,300.91",Red Line
+41.99366,-87.6592,40760,Granville,Red,1119 W. Granville Avenue,TRUE,FALSE,"1,167,506.04","1,941,002.51",Red Line
+41.9437,-87.67088,41310,Paulina,Brown,3411 N. Paulina Street,TRUE,FALSE,"1,164,471.23","1,922,773.87",Brown Line
+41.87088,-87.77678,40010,Austin-Congress,Blue,1050 S. Austin Blvd,FALSE,FALSE,"1,135,832.54","1,896,032.41",Blue Line
+41.96792,-87.71314,41290,Kimball,Brown,4755 N. Kimball Avenue,TRUE,TRUE,"1,152,910.88","1,931,513.34",Brown Line
+41.89166,-87.62802,40330,Grand/State,Red,521 N. State Street,TRUE,FALSE,"1,176,288.18","1,903,902.01",Red Line
+41.85413,-87.70542,41040,Kedzie-Douglas,Pink,1944 S. Kedzie Avenue,TRUE,FALSE,"1,155,312.30","1,890,060.72",Pink Line
+41.8849,-87.71652,41670,Conservatory-Central Park,Green,3631 W. Lake Street,TRUE,FALSE,"1,152,209.10","1,901,252.72",Green Line
+41.85375,-87.73326,40600,Kostner,Pink,2019 S. Kostner Avenue,TRUE,FALSE,"1,147,729.86","1,889,868.06",Pink Line
+41.98232,-87.80889,40750,Harlem-O'Hare,Blue,5550 N. Harlem Avenue,TRUE,TRUE,"1,126,838.70","1,936,585.07",Blue Line
