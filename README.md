@@ -88,40 +88,6 @@ The [keys.toml](keys.toml) file contains my API developer keys for the train and
 CTA API Developer homepage: https://www.transitchicago.com/developers/
 
 
-<div id="mark-train-tracker-arrivals-api"></div>
-
-#### Train Tracker Arrivals API
-
-Documentation:
-
-Stored locally at:
-[docs/apis/cta-train-tracker-api-developer-guide.pdf](./docs/apis/cta-train-tracker-api-developer-guide.pdf)
-
-Sample call:
-http://lapi.transitchicago.com/api/1.0/ttarrivals.aspx?key=API_DEV_KEY&outputType=JSON&mapid=40380
-
-Sample data: [tests/samples/train-ttarrivals.json](./tests/samples/train-ttarrivals.json)
-
-Make a call for each nearby train station (`mapid=STATION_ID`). This will return a JSON object with an array `eta` consisting of every incoming train and its estimated arrival time.
-
-Gather the distinct combinations of line/route (`rt`) and destination name (`destNm`) per station. For each one, display the ETA of the nearest train. The API will return all incoming trains for a given line and destination — but we just want to show the trains for that line/destination that is closest to a given station in terms of estimated arrival time.
-
-<div id="mark-train-color-key"></div>
-
-##### Color key
-
-Each entry in the `eta` array has a `rt` attribute. Use the following key to translate each `rt` identifier with a human readable color:
-
-• Red = Red
-• Blue = Blue
-• Brn = Brown
-• G = Green
-• Org = Orange
-• P = Purple
-• Pink = Pink
-• Y = Yellow
-
-
 
 <div id="mark-bus-get-predictions-api"></div>
 
@@ -138,24 +104,103 @@ https://www.ctabustracker.com/bustime/api/v3/getpredictions?key=API_DEV_KEY&form
 Sample data: [tests/samples/bus-predictions.json](./tests/samples/bus-predictions.json)
 
 
-The API JSON response returns a `prd` array, with each entry consisting of a predicted bus arrival. As with the trains, we don't want to collect EVERY bus, just the nearest bus, per route (`rt` attribute) and direction (`rtdir` attribute).
+The API JSON response returns a `prd` array, with each entry consisting of a predicted bus arrival. However, we don't want to list EVERY bus, just the nearest bus, per route (`rt` attribute) and direction (`rtdir` attribute).
 
 
 <div id="mark-bus-stop-filtering"></div>
 
 ##### Bus arrivals and stops filtering
 
-Unlike the trains, we don't want to map EVERY bus stop that we fetched data for. We just want to map the bus stops for which the nearest bus (per route and per direction) is arriving. So the bus tracker API might return 10 records for buses with route=151 and rtdir=North. I want the closest bus by ETA for route 151 North, and I want to show on the map the bus stop (`stpid`) that that bus arrives at. There may also be arrival data for a later 151 North bus at a stop farther away — I would NOT want to map that stop (because the user presumably only cares about the closest bus)
+For any given bus route+direction, there will be multiple stops near the user (as many as one every two blocks). We don't want to show all those stops, just the 2 stops nearest to the user for every route+direction. And we want to see the 2 closest buses (by ETA) per bus stop and route+direction.
+
+So the bus tracker API might return 10 arrival records for buses with route=151 and rtdir=North. First, I want to find the two closest stops (by `stpid`) found in those 10 arrival records for 151 North.
+
+Then for each of those stops, I want to find the 2 closest 151 North buses.
+
+In the end, we may map as many as 2 stops that service 151 North buses, and show the user the 2 closest buses for each of those stops. There may be other 151 North bus stops within 0.5 miles of the user that are farther away, but we don't want to show those, or the bus arrivals for those stops (because the user presumably only cares about the closest bus)
 
 The data flow process for bus data is thus:
 
 - Get the 10 nearest stops to the user from the static cta-bus-stops.csv file (within 0.5 miles)
 - Call the bus tracker getPredictions API using those stop ids
 - In the returned `prd` array, find every distinct combination of `rt` and `rtdir`
-- Then find the closest bus per rt/rtdir combination
-- Map only the bus stops whose stop IDs are found in that list of closest buses per rt/rtdirs
+- For each rt/rtdir combination, find the two stops (collect `stpid`) nearest to the user that service each rt/rtdir combination — that way we give the user a choice of which bus stop on the route to walk to.
+- Then for each rt/rtdir combination per each stop, find the two closest buses by ETA — that way if the user won't catch the most recent bus+route at a stop, they know when the next one is coming
+- Map only the bus stops whose stop IDs are found in that filtered list of closest buses per rt/rtdirs
 
 
+###### Additional bus stop filtering
+
+Bus stops for different directions (e.g. Northbound and Southbound) for given route (e.g. 36) tend to be across the street from each other and share the same name (e.g. the corner closest to them, like "Bryn Mawr & Clark St". So after all the close bus stops and arriving bus data is collected, I want to do an additional level of filtering.
+
+Group together bus data that, in the API, have the same stop name — i.e. the `stpnm: "Sheridan & Winthrop"` attribute, and route (i.e. `rt: 147` attribute) — even if they have different directions (e.g. `rtdir` is "Northbound" and "Southbound").
+
+Create one "stop" group with the name of "Sheridan & Winthrop", that contains all the arrival entries for Route 147 buses, whether they're going north or south.
+
+That way, when we list the "Upcoming Arrivals", we can list the groupings as such:
+
+- Name of stop (Sheridan & Winthrop)
+    - Name of route (147)
+        - Northbound: arriving in x minutes and y minutes
+        - Southbound: arriving in z minutes and q minutes
+
+For map marking, keep track of the lat/lng for the Northbound and Southbound version of the stop. Place the marker at the midpoint of those coordinates. There should be one map marker for the "Sheridan & Winthrop" stop
+
+
+
+
+
+<div id="mark-train-tracker-arrivals-api"></div>
+
+#### Train Tracker Arrivals API
+
+Documentation:
+
+Stored locally at:
+[docs/apis/cta-train-tracker-api-developer-guide.pdf](./docs/apis/cta-train-tracker-api-developer-guide.pdf)
+
+Sample call:
+http://lapi.transitchicago.com/api/1.0/ttarrivals.aspx?key=API_DEV_KEY&outputType=JSON&mapid=40380
+
+Sample data: [tests/samples/train-ttarrivals.json](./tests/samples/train-ttarrivals.json)
+
+Make a call for each nearby train station (`mapid=STATION_ID`). This will return a JSON object with an array `eta` consisting of every incoming train and its estimated arrival time.
+
+As with buses, we don't want to map every train station, just the stations corresponding to the closest train (via ETA) for every route (aka line) and destination.
+
+Unlike bus stops, train stations are spaced farther away. So instead of collecting the closest two stations per route+destination, we just need to find the closest station per route+destination, and then the 2 closest trains per route+destination at that station.
+
+So from the `eta` array, gather every distinct combination of line/route (`rt`) and destination name (`destNm`).
+
+Then find the two stations (the `staId` attribute in the API response) nearest to the user for each of those rt+destNm combinations.
+
+Then for each station + rt+destName combination, find the two closest trains by ETA
+
+Map/list the collected stations and their closest trains
+
+- Get every train station within 0.5 miles from the user from the static cta-train-stations.csv file. Gather the `STATION_ID`
+- Call the `ttarrivals` API for each station ID
+- Collect and combine the `eta` arrays in each API response
+- Then find every distinct combination of `rt` and `destNm`
+- then find the closest station (staId) to the user per rt + destNm combo
+- Then find the two closest ETA trains per station + rt + destNm combination
+- Map only the train stations whose STATION_ID are found in that list of `staId` collected for the closest trains via the API.
+
+
+<div id="mark-train-color-key"></div>
+
+##### Color key
+
+Each entry in the `eta` array has a `rt` attribute. Use the following key to translate each `rt` identifier with a human readable color:
+
+• Red = Red
+• Blue = Blue
+• Brn = Brown
+• G = Green
+• Org = Orange
+• P = Purple
+• Pink = Pink
+• Y = Yellow
 
 
 

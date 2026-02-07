@@ -9,7 +9,6 @@
     formatClock,
     formatMinutes,
     minutesUntil,
-    nextPerRoute,
     parseBusApiDate,
     parseBusStops,
     parseKeysFile,
@@ -21,7 +20,7 @@
 
   const SEARCH_RADIUS_MILES = 0.5;
   const SEARCH_RADIUS_METERS = SEARCH_RADIUS_MILES * 1609.344;
-  const WALK_SPEED_MPH = 4;
+  const WALK_SPEED_MPH = 2;
 
   let loading = false;
   let loadingMessage = '';
@@ -81,7 +80,11 @@
       return Number.MAX_SAFE_INTEGER;
     };
 
-    const entries = await Promise.all(
+    const distanceByStationId = new Map(
+      stops.map((stop) => [String(stop.stationId ?? stop.stopId), stop.distanceMiles])
+    );
+
+    const perStationPredictions = await Promise.all(
       stops.map(async (stop) => {
         const url = new URL('/api/train/api/1.0/ttarrivals.aspx', window.location.origin);
         url.searchParams.set('key', trainApiKey);
@@ -93,52 +96,96 @@
           const payload = await response.json();
 
           if (payload?.ctatt?.errCd && payload.ctatt.errCd !== '0') {
-            return [stop.stopId, []];
+            return [];
           }
 
           const rawEta = payload?.ctatt?.eta;
           const etaList = Array.isArray(rawEta) ? rawEta : rawEta ? [rawEta] : [];
+          const predictions = [];
 
-          const closestByRouteDestination = new Map();
           for (const eta of etaList) {
             const arrival = parseTrainApiDate(eta.arrT);
             const displayRoute = trainDisplayFromRoute(eta.rt);
             const destination = eta.destNm || 'Unknown destination';
 
-            const normalized = {
+            predictions.push({
               mode: 'train',
+              stopId: String(eta.staId || stop.stationId || stop.stopId),
               route: displayRoute.name || 'Train',
               direction: `toward ${destination}`,
               destination,
               arrival,
               minutes: minutesUntil(arrival)
-            };
-
-            const key = `${normalized.route}|${destination}`;
-            const existing = closestByRouteDestination.get(key);
-            if (!existing || predictionTime(normalized) < predictionTime(existing)) {
-              closestByRouteDestination.set(key, normalized);
-            }
+            });
           }
 
-          const normalized = [...closestByRouteDestination.values()].sort(
-            (a, b) => predictionTime(a) - predictionTime(b)
-          );
-
-          return [stop.stopId, normalized];
+          return predictions;
         } catch {
-          return [stop.stopId, []];
+          return [];
         }
       })
     );
 
-    return new Map(entries);
+    const allPredictions = perStationPredictions.flat();
+    const predictionsByRouteDestination = new Map();
+
+    for (const prediction of allPredictions) {
+      const key = `${prediction.route}|${prediction.destination}`;
+      const group = predictionsByRouteDestination.get(key) ?? [];
+      group.push(prediction);
+      predictionsByRouteDestination.set(key, group);
+    }
+
+    const results = new Map(stops.map((stop) => [stop.stopId, []]));
+    const selectedStopIds = new Set();
+
+    for (const group of predictionsByRouteDestination.values()) {
+      const stationIds = [...new Set(group.map((prediction) => prediction.stopId))].filter((stationId) =>
+        distanceByStationId.has(stationId)
+      );
+
+      stationIds.sort(
+        (a, b) =>
+          (distanceByStationId.get(a) ?? Number.MAX_SAFE_INTEGER) -
+          (distanceByStationId.get(b) ?? Number.MAX_SAFE_INTEGER)
+      );
+
+      const chosenStationId = stationIds[0];
+      if (!chosenStationId) {
+        continue;
+      }
+
+      const topTwo = group
+        .filter((prediction) => prediction.stopId === chosenStationId)
+        .sort((a, b) => predictionTime(a) - predictionTime(b))
+        .slice(0, 2);
+
+      if (!topTwo.length) {
+        continue;
+      }
+
+      selectedStopIds.add(chosenStationId);
+      const stationPredictions = results.get(chosenStationId) ?? [];
+      stationPredictions.push(...topTwo);
+      results.set(chosenStationId, stationPredictions);
+    }
+
+    for (const [stationId, predictions] of results.entries()) {
+      predictions.sort((a, b) => predictionTime(a) - predictionTime(b));
+      results.set(stationId, predictions);
+    }
+
+    return {
+      predictionsByStop: results,
+      selectedStopIds
+    };
   }
 
   async function fetchBusPredictions(stops, busApiKey) {
     const results = new Map(stops.map((stop) => [stop.stopId, []]));
     const allPredictions = [];
     const stopIds = stops.map((stop) => stop.stopId);
+    const distanceByStopId = new Map(stops.map((stop) => [String(stop.stopId), stop.distanceMiles]));
 
     const predictionTime = (prediction) => {
       if (prediction.arrival instanceof Date && !Number.isNaN(prediction.arrival.getTime())) {
@@ -183,6 +230,7 @@
           const normalized = {
             mode: 'bus',
             stopId: prediction.stpid,
+            stopName: prediction.stpnm || '',
             route: prediction.rt || 'Bus',
             direction: prediction.rtdir || 'Inbound',
             destination: prediction.des || '',
@@ -197,20 +245,40 @@
       }
     }
 
-    const closestByRouteDirection = new Map();
+    const predictionsByRouteDirection = new Map();
     for (const prediction of allPredictions) {
       const key = `${prediction.route}|${prediction.direction}`;
-      const existing = closestByRouteDirection.get(key);
-
-      if (!existing || predictionTime(prediction) < predictionTime(existing)) {
-        closestByRouteDirection.set(key, prediction);
-      }
+      const group = predictionsByRouteDirection.get(key) ?? [];
+      group.push(prediction);
+      predictionsByRouteDirection.set(key, group);
     }
 
-    for (const prediction of closestByRouteDirection.values()) {
-      const stopPredictions = results.get(prediction.stopId) ?? [];
-      stopPredictions.push(prediction);
-      results.set(prediction.stopId, stopPredictions);
+    const selectedStopIds = new Set();
+    for (const group of predictionsByRouteDirection.values()) {
+      const closestStops = [...new Set(group.map((prediction) => String(prediction.stopId)))]
+        .filter((stopId) => distanceByStopId.has(stopId))
+        .sort(
+          (a, b) =>
+            (distanceByStopId.get(a) ?? Number.MAX_SAFE_INTEGER) -
+            (distanceByStopId.get(b) ?? Number.MAX_SAFE_INTEGER)
+        )
+        .slice(0, 2);
+
+      for (const stopId of closestStops) {
+        const topTwo = group
+          .filter((prediction) => String(prediction.stopId) === stopId)
+          .sort((a, b) => predictionTime(a) - predictionTime(b))
+          .slice(0, 2);
+
+        if (!topTwo.length) {
+          continue;
+        }
+
+        selectedStopIds.add(stopId);
+        const stopPredictions = results.get(stopId) ?? [];
+        stopPredictions.push(...topTwo);
+        results.set(stopId, stopPredictions);
+      }
     }
 
     for (const [stopId, predictions] of results.entries()) {
@@ -220,8 +288,81 @@
 
     return {
       predictionsByStop: results,
-      selectedStopIds: new Set([...closestByRouteDirection.values()].map((prediction) => prediction.stopId))
+      selectedStopIds
     };
+  }
+
+  function groupBusStopsByName(candidateBusStops, busData) {
+    const stopById = new Map(candidateBusStops.map((stop) => [String(stop.stopId), stop]));
+    const grouped = new Map();
+
+    for (const stopId of busData.selectedStopIds) {
+      const stop = stopById.get(String(stopId));
+      if (!stop) {
+        continue;
+      }
+
+      const predictions = busData.predictionsByStop.get(String(stopId)) ?? [];
+      for (const prediction of predictions) {
+        const stopName = String(prediction.stopName || stop.displayName || '').trim() || stop.displayName;
+        const key = stopName.toUpperCase();
+
+        let group = grouped.get(key);
+        if (!group) {
+          group = {
+            type: 'bus',
+            stopId: `bus:${key}`,
+            displayName: stopName,
+            members: new Map(),
+            routeDirections: new Map()
+          };
+          grouped.set(key, group);
+        }
+
+        group.members.set(String(stop.stopId), stop);
+
+        const route = String(prediction.route || 'Bus').trim() || 'Bus';
+        const direction = String(prediction.direction || 'Inbound').trim() || 'Inbound';
+        const routeKey = `${route}|${direction}`;
+
+        const directionPredictions = group.routeDirections.get(routeKey) ?? [];
+        directionPredictions.push({
+          ...prediction,
+          route,
+          direction
+        });
+        group.routeDirections.set(routeKey, directionPredictions);
+      }
+    }
+
+    return [...grouped.values()].map((group) => {
+      const members = [...group.members.values()];
+      const latitude =
+        members.reduce((sum, member) => sum + member.latitude, 0) / Math.max(1, members.length);
+      const longitude =
+        members.reduce((sum, member) => sum + member.longitude, 0) / Math.max(1, members.length);
+      const distanceMiles = members.reduce(
+        (minDistance, member) => Math.min(minDistance, member.distanceMiles),
+        Number.MAX_SAFE_INTEGER
+      );
+      const predictionSortTime = (prediction) => prediction.arrival?.getTime?.() ?? Number.MAX_SAFE_INTEGER;
+
+      const predictions = [...group.routeDirections.values()]
+        .flatMap((directionPredictions) =>
+          [...directionPredictions].sort((a, b) => predictionSortTime(a) - predictionSortTime(b)).slice(0, 2)
+        )
+        .sort((a, b) => predictionSortTime(a) - predictionSortTime(b));
+
+      return {
+        type: 'bus',
+        stopId: group.stopId,
+        displayName: group.displayName,
+        latitude,
+        longitude,
+        distanceMiles,
+        predictions
+      };
+    });
   }
 
   function markerBackground(stop) {
@@ -249,7 +390,39 @@
     return `conic-gradient(${parts.join(', ')})`;
   }
 
+  function busMarkerLines(stop) {
+    const routes = [...new Set((stop.predictions ?? []).map((prediction) => String(prediction.route)))]
+      .map((route) => route.trim())
+      .filter(Boolean);
+
+    if (!routes.length) {
+      return ['Bus'];
+    }
+
+    const visibleRoutes = routes.slice(0, 3);
+    if (routes.length > 3) {
+      visibleRoutes.push('...');
+    }
+    return visibleRoutes;
+  }
+
   function markerIcon(stop) {
+    if (stop.type === 'bus') {
+      const lines = busMarkerLines(stop);
+      const lineHtml = lines
+        .map((line) => `<span class="bus-marker-line">${escapeHtml(line)}</span>`)
+        .join('');
+      const height = 10 + lines.length * 11;
+
+      return L.divIcon({
+        className: 'stop-marker-wrapper',
+        html: `<span class="bus-marker">${lineHtml}</span>`,
+        iconSize: [56, height],
+        iconAnchor: [28, Math.round(height / 2)],
+        popupAnchor: [0, -10]
+      });
+    }
+
     return L.divIcon({
       className: 'stop-marker-wrapper',
       html: `<span class="stop-marker" style="background:${markerBackground(stop)}"></span>`,
@@ -259,43 +432,8 @@
     });
   }
 
-  function stopLinesLabel(stop) {
-    if (stop.type === 'bus') {
-      return 'Bus stop';
-    }
-
-    if (!stop.lines.length) {
-      return 'Train station';
-    }
-
-    return stop.lines.map((line) => line.id).join(', ');
-  }
-
-  function popupHtml(stop) {
-    const predictions = nextPerRoute(stop.predictions).slice(0, 8);
-
-    const predictionMarkup = predictions.length
-      ? predictions
-          .map(
-            (prediction) => `
-              <li>
-                <strong>${escapeHtml(prediction.route)}</strong>
-                ${escapeHtml(prediction.direction)}
-                ${prediction.destination ? `to ${escapeHtml(prediction.destination)}` : ''}
-                <span>${escapeHtml(formatMinutes(prediction.minutes))} (${escapeHtml(formatClock(prediction.arrival))})</span>
-              </li>
-            `
-          )
-          .join('')
-      : '<li>No live predictions at this time.</li>';
-
-    return `
-      <div class="popup">
-        <h3>${escapeHtml(stop.displayName)}</h3>
-        <p>${escapeHtml(stop.type === 'bus' ? 'Bus stop' : 'Train station')} • ${escapeHtml(distanceWithWalkText(stop.distanceMiles))}</p>
-        <ul>${predictionMarkup}</ul>
-      </div>
-    `;
+  function busDirectionOnly(prediction) {
+    return String(prediction.direction ?? '').trim() || 'N/A';
   }
 
   function destinationOrDirection(prediction) {
@@ -318,20 +456,92 @@
     return direction || destination || 'N/A';
   }
 
-  function arrivalMinutesText(minutes) {
+  function popupHtml(stop) {
+    const walkMinutes = walkingMinutesFromMiles(stop.distanceMiles);
+    const predictions = [...(stop.predictions ?? [])]
+      .sort((a, b) => {
+        const left = a.arrival?.getTime?.() ?? Number.MAX_SAFE_INTEGER;
+        const right = b.arrival?.getTime?.() ?? Number.MAX_SAFE_INTEGER;
+        return left - right;
+      })
+      .slice(0, 8);
+
+    const predictionMarkup = predictions.length
+      ? predictions
+          .map(
+            (prediction) => `
+              <li>
+                <strong>${escapeHtml(prediction.route)}</strong>
+                ${escapeHtml(
+                  prediction.mode === 'bus'
+                    ? busDirectionOnly(prediction)
+                    : destinationOrDirection(prediction)
+                )}
+                <span class="${etaTimingClass(prediction.minutes, walkMinutes)}">${escapeHtml(
+                  formatMinutes(prediction.minutes)
+                )} (${escapeHtml(formatClock(prediction.arrival))})</span>
+              </li>
+            `
+          )
+          .join('')
+      : '<li>No live predictions at this time.</li>';
+
+    return `
+      <div class="popup">
+        <h3>${escapeHtml(stop.displayName)}</h3>
+        <p>${escapeHtml(stop.type === 'bus' ? 'Bus stop' : 'Train station')} • ${escapeHtml(distanceWithWalkText(stop.distanceMiles))}</p>
+        <ul>${predictionMarkup}</ul>
+      </div>
+    `;
+  }
+
+  function arrivalPrefixText(minutes) {
     if (minutes === null || minutes === undefined) {
-      return 'arriving at an unknown time';
+      return 'arriving at';
     }
 
     if (minutes <= 0) {
-      return 'arriving now';
+      return 'arriving';
     }
 
-    if (minutes === 1) {
-      return 'arriving in 1 minute';
+    return 'arriving in';
+  }
+
+  function etaValueText(minutes) {
+    if (minutes === null || minutes === undefined) {
+      return 'unknown time';
     }
 
-    return `arriving in ${minutes} minutes`;
+    if (minutes <= 0) {
+      return 'now';
+    }
+
+    return String(minutes);
+  }
+
+  function etaUnitText(minutes) {
+    if (minutes === null || minutes === undefined || minutes <= 0) {
+      return '';
+    }
+
+    return minutes === 1 ? 'minute' : 'minutes';
+  }
+
+  function etaTimingClass(etaMinutes, walkMinutes) {
+    if (!Number.isFinite(etaMinutes) || !Number.isFinite(walkMinutes)) {
+      return 'eta-blue';
+    }
+
+    if (etaMinutes <= 0 || etaMinutes < walkMinutes) {
+      return 'eta-red';
+    }
+
+    const delta = etaMinutes - walkMinutes;
+    if (delta >= 1 && delta <= 3) {
+      return 'eta-orange';
+    }
+
+    return 'eta-blue';
   }
 
   function compactClock(date) {
@@ -343,8 +553,23 @@
       return null;
     }
 
-    const minutes = Math.ceil((miles / WALK_SPEED_MPH) * 60);
-    return Math.max(0, minutes);
+    const feet = miles * 5280;
+    const baseMinutes = Math.ceil((miles / WALK_SPEED_MPH) * 60);
+    const extraMinutes = Math.ceil(feet / 500);
+    return Math.max(0, baseMinutes + extraMinutes);
+  }
+
+  function distanceOnlyText(miles) {
+    if (!Number.isFinite(miles)) {
+      return '';
+    }
+
+    return miles < 0.6 ? `${Math.round(miles * 5280)} ft` : `${miles.toFixed(2)} mi`;
+  }
+
+  function walkingAwayText(miles) {
+    const walkMinutes = walkingMinutesFromMiles(miles);
+    return walkMinutes === 1 ? '1 min away' : `${walkMinutes} min away`;
   }
 
   function distanceWithWalkText(miles) {
@@ -352,38 +577,7 @@
       return '';
     }
 
-    const walkMinutes = walkingMinutesFromMiles(miles);
-    const walkText = walkMinutes === 1 ? '1 min away' : `${walkMinutes} min away`;
-    return `${miles.toFixed(2)} mi, ${walkText}`;
-  }
-
-  function hexToRgb(hexColor) {
-    const hex = String(hexColor ?? '').replace('#', '');
-    if (!/^[0-9a-fA-F]{6}$/.test(hex)) {
-      return null;
-    }
-    return {
-      r: Number.parseInt(hex.slice(0, 2), 16),
-      g: Number.parseInt(hex.slice(2, 4), 16),
-      b: Number.parseInt(hex.slice(4, 6), 16)
-    };
-  }
-
-  function trainBadgeStyle(routeName) {
-    const lineMeta = Object.values(TRAIN_LINE_META).find(
-      (line) => line.id.toLowerCase() === String(routeName ?? '').toLowerCase()
-    );
-
-    if (!lineMeta) {
-      return '';
-    }
-
-    const rgb = hexToRgb(lineMeta.color);
-    if (!rgb) {
-      return '';
-    }
-
-    return `background-color: rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.16); border-color: rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.5);`;
+    return `${distanceOnlyText(miles)}, ${walkingAwayText(miles)}`;
   }
 
   async function ensureLeaflet() {
@@ -494,7 +688,7 @@
       const candidateBusStops = nearbyBusStops.slice(0, 10);
 
       loadingMessage = 'Loading train and bus ETAs...';
-      const [trainPredictions, busData] = await Promise.all([
+      const [trainData, busData] = await Promise.all([
         fetchTrainPredictions(nearbyTrainStations, keys.train),
         fetchBusPredictions(candidateBusStops, keys.bus)
       ]);
@@ -502,18 +696,17 @@
         return;
       }
 
-      const enrichedTrainStops = nearbyTrainStations.map((stop) => ({
-        ...stop,
-        predictions: trainPredictions.get(stop.stopId) ?? []
-      }));
-
-      const enrichedBusStops = candidateBusStops
-        .filter((stop) => busData.selectedStopIds.has(stop.stopId))
+      const enrichedTrainStops = nearbyTrainStations
+        .filter((stop) => trainData.selectedStopIds.has(stop.stopId))
         .map((stop) => ({
           ...stop,
-          predictions: busData.predictionsByStop.get(stop.stopId) ?? []
+          predictions: trainData.predictionsByStop.get(stop.stopId) ?? []
         }))
         .filter((stop) => stop.predictions.length > 0);
+
+      const enrichedBusStops = groupBusStopsByName(candidateBusStops, busData).filter(
+        (stop) => stop.predictions.length > 0
+      );
 
       nearbyStops = [...enrichedTrainStops, ...enrichedBusStops].sort(
         (a, b) => a.distanceMiles - b.distanceMiles
@@ -567,22 +760,88 @@
       .map((line) => ({ label: line.id, color: line.color }))
   ];
 
-  $: upcomingArrivals = nearbyStops
-    .flatMap((stop) =>
-      (stop.predictions ?? []).map((prediction) => ({
-        etaTime: compactClock(prediction.arrival),
-        type: stop.type,
-        routeLabel: stop.type === 'train' ? `${prediction.route} Line` : String(prediction.route),
-        typeLabel: stop.type === 'train' ? 'Train' : 'Bus',
-        routeBadgeStyle: stop.type === 'train' ? trainBadgeStyle(prediction.route) : '',
-        destinationDirection: destinationOrDirection(prediction),
+  $: upcomingStops = nearbyStops
+    .filter((stop) => (stop.predictions?.length ?? 0) > 0)
+    .sort((a, b) => a.distanceMiles - b.distanceMiles)
+    .map((stop) => {
+      const walkMinutes = walkingMinutesFromMiles(stop.distanceMiles);
+      const groupedByDirection = new Map();
+
+      for (const prediction of stop.predictions ?? []) {
+        const routeName = String(prediction.route);
+        const directionLabel =
+          stop.type === 'bus' ? busDirectionOnly(prediction) : destinationOrDirection(prediction);
+        const directionGroup = groupedByDirection.get(directionLabel) ?? {
+          direction: directionLabel,
+          routes: new Map()
+        };
+        const routeGroup = directionGroup.routes.get(routeName) ?? {
+          route: routeName,
+          typeLabel: stop.type === 'train' ? 'Train' : 'Bus',
+          etas: []
+        };
+        routeGroup.etas.push(prediction);
+        directionGroup.routes.set(routeName, routeGroup);
+        groupedByDirection.set(directionLabel, directionGroup);
+      }
+
+      const directions = [...groupedByDirection.values()]
+        .map((directionGroup) => ({
+          direction: directionGroup.direction,
+          routes: [...directionGroup.routes.values()]
+            .map((routeGroup) => ({
+              route: routeGroup.route,
+              typeLabel: routeGroup.typeLabel,
+              etas: [...routeGroup.etas]
+                .sort((a, b) => {
+                  const left = a.arrival?.getTime?.() ?? Number.MAX_SAFE_INTEGER;
+                  const right = b.arrival?.getTime?.() ?? Number.MAX_SAFE_INTEGER;
+                  return left - right;
+                })
+                .slice(0, 2)
+                .map((eta) => ({
+                  minutes: eta.minutes,
+                  prefixText: arrivalPrefixText(eta.minutes),
+                  clockText: compactClock(eta.arrival),
+                  timingClass: etaTimingClass(eta.minutes, walkMinutes),
+                  sortTime: eta.arrival?.getTime?.() ?? Number.MAX_SAFE_INTEGER
+                }))
+            }))
+            .sort((a, b) => {
+              const routeCompare = a.route.localeCompare(b.route, undefined, {
+                numeric: true,
+                sensitivity: 'base'
+              });
+              if (routeCompare !== 0) {
+                return routeCompare;
+              }
+              const left = a.etas[0]?.sortTime ?? Number.MAX_SAFE_INTEGER;
+              const right = b.etas[0]?.sortTime ?? Number.MAX_SAFE_INTEGER;
+              return left - right;
+            })
+        }))
+        .sort((a, b) => {
+          const directionCompare = a.direction.localeCompare(b.direction, undefined, {
+            numeric: true,
+            sensitivity: 'base'
+          });
+          if (directionCompare !== 0) {
+            return directionCompare;
+          }
+          const left = a.routes[0]?.etas[0]?.sortTime ?? Number.MAX_SAFE_INTEGER;
+          const right = b.routes[0]?.etas[0]?.sortTime ?? Number.MAX_SAFE_INTEGER;
+          return left - right;
+        });
+
+      return {
+        stopId: stop.stopId,
+        icon: stop.type === 'train' ? '🚆' : '🚌',
+        distanceText: distanceOnlyText(stop.distanceMiles),
+        walkText: walkingAwayText(stop.distanceMiles),
         stopName: stop.displayName,
-        distance: distanceWithWalkText(stop.distanceMiles),
-        etaMinutesText: arrivalMinutesText(prediction.minutes),
-        sortTime: prediction.arrival?.getTime?.() ?? Number.MAX_SAFE_INTEGER
-      }))
-    )
-    .sort((a, b) => a.sortTime - b.sortTime);
+        directions
+      };
+    });
 </script>
 
 <svelte:head>
@@ -638,22 +897,51 @@
 
     {#if !loading && !errorMessage && nearbyStops.length === 0}
       <p class="empty">No CTA stops found in the default 0.5-mile radius.</p>
-    {:else if !loading && !errorMessage && upcomingArrivals.length === 0}
+    {:else if !loading && !errorMessage && upcomingStops.length === 0}
       <p class="empty">No live arrivals available right now.</p>
-    {:else if upcomingArrivals.length > 0}
+    {:else if upcomingStops.length > 0}
       <ul class="arrival-list">
-        {#each upcomingArrivals as item}
+        {#each upcomingStops as stop}
           <li class="arrival-item">
-            <span class="arrival-line">
-              <span class="arrival-emoji">{item.type === 'train' ? '🚆' : '🚌'}</span>
-              <strong class="arrival-time">{item.etaTime}</strong>:
-              <span class={`route-line ${item.type}`} style={item.routeBadgeStyle}>{item.routeLabel}</span>
-              <span class="type-label">{item.typeLabel}</span>
-              <span class="arrival-emphasis">({item.destinationDirection})</span>
-              <span class="eta-minutes">{item.etaMinutesText}</span>
-              at <span class="stop-name">{item.stopName}</span>
-              <span class="distance">({item.distance})</span>
-            </span>
+            <div class="stop-header">
+              <span class="arrival-emoji">{stop.icon}</span>
+              <span class="distance">{stop.distanceText}</span>
+              <span>({stop.walkText}):</span>
+              <span class="stop-name">{stop.stopName}</span>
+            </div>
+            <ul class="route-list">
+              {#each stop.directions as direction}
+                <li class="direction-group-item">
+                  <span class="route-dash">-</span>
+                  <span class="arrival-emphasis">{direction.direction}:</span>
+                  <ul class="direction-list">
+                    {#each direction.routes as route}
+                      <li class="route-item">
+                        <span class="route-name">{route.route}</span>
+                        <span>{route.typeLabel}</span>
+                        {#each route.etas as eta, etaIndex}
+                          {#if etaIndex === 0}
+                            <span class="eta-prefix">{eta.prefixText}</span>
+                            <span class={`eta-part ${eta.timingClass}`}>{etaValueText(eta.minutes)}</span>
+                            {#if etaUnitText(eta.minutes)}
+                              <span class="eta-unit">{etaUnitText(eta.minutes)}</span>
+                            {/if}
+                            <span class={`eta-part ${eta.timingClass}`}>({eta.clockText})</span>
+                          {:else}
+                            <span class="eta-join">and</span>
+                            <span class={`eta-part ${eta.timingClass}`}>{etaValueText(eta.minutes)}</span>
+                            {#if etaUnitText(eta.minutes)}
+                              <span class="eta-unit">{etaUnitText(eta.minutes)}</span>
+                            {/if}
+                            <span class={`eta-part ${eta.timingClass}`}>({eta.clockText})</span>
+                          {/if}
+                        {/each}
+                      </li>
+                    {/each}
+                  </ul>
+                </li>
+              {/each}
+            </ul>
           </li>
         {/each}
       </ul>
@@ -683,6 +971,28 @@
     border-radius: 999px;
     border: 2px solid #ffffff;
     box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.3);
+  }
+
+  :global(.bus-marker) {
+    display: inline-flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-width: 34px;
+    padding: 3px 6px;
+    border-radius: 10px;
+    border: 2px solid #ffffff;
+    background: #111111;
+    color: #ffffff;
+    font-size: 10px;
+    font-weight: 700;
+    line-height: 1.05;
+    box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.35);
+  }
+
+  :global(.bus-marker-line) {
+    display: block;
+    white-space: nowrap;
   }
 
   :global(.popup h3) {
@@ -832,31 +1142,34 @@
     margin-right: 6px;
   }
 
-  .arrival-time {
+  .stop-header {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 4px;
+  }
+
+  .route-list {
+    list-style: none;
+    margin: 4px 0 0 0;
+    padding: 0 0 0 16px;
+  }
+
+  .direction-group-item {
+    margin: 2px 0;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    align-items: flex-start;
+  }
+
+  .route-dash {
+    margin-left: -12px;
+    width: 8px;
+  }
+
+  .route-name {
     font-weight: 700;
-  }
-
-  .route-line {
-    display: inline-block;
-    margin: 0 2px;
-    padding: 1px 6px;
-    border-radius: 999px;
-    border: 1px solid #d8e0eb;
-    background: #f8fafc;
-    font-weight: 700;
-  }
-
-  .route-line.train {
-    border-color: #d8e0eb;
-  }
-
-  .route-line.bus {
-    color: #1f2937;
-  }
-
-  .type-label {
-    font-weight: 500;
-    color: #334155;
   }
 
   .arrival-emphasis {
@@ -864,7 +1177,51 @@
     color: #334155;
   }
 
-  .eta-minutes {
+  .direction-list {
+    list-style: none;
+    margin: 0;
+    padding: 0 0 0 10px;
+    width: 100%;
+  }
+
+  .route-item {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    margin-top: 1px;
+  }
+
+  .eta-part {
+    white-space: nowrap;
+  }
+
+  .eta-prefix {
+    color: #344054;
+  }
+
+  .eta-unit {
+    color: #344054;
+  }
+
+  .eta-join {
+    color: #344054;
+  }
+
+  .eta-red,
+  :global(.popup .eta-red) {
+    color: #b42318;
+    font-weight: 700;
+  }
+
+  .eta-orange,
+  :global(.popup .eta-orange) {
+    color: #b54708;
+    font-weight: 700;
+  }
+
+  .eta-blue,
+  :global(.popup .eta-blue) {
+    color: #175cd3;
     font-weight: 700;
   }
 
@@ -898,6 +1255,10 @@
       padding: 6px 8px;
       font-size: 0.84rem;
       line-height: 1.2;
+    }
+
+    .route-list {
+      padding-left: 12px;
     }
   }
 </style>
