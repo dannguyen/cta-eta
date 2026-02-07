@@ -18,7 +18,6 @@
   } from '$lib/cta';
 
   const SEARCH_RADIUS_MILES = 0.5;
-  const SEARCH_RADIUS_METERS = SEARCH_RADIUS_MILES * 1609.344;
   const WALK_SPEED_MPH = 2;
   const CTA_PROXY_BASE = String(import.meta.env.VITE_CTA_PROXY_BASE ?? '').trim();
 
@@ -127,7 +126,7 @@
               mode: 'train',
               stopId: String(eta.staId || stop.stationId || stop.stopId),
               route: displayRoute.name || 'Train',
-              direction: `toward ${destination}`,
+              direction: `${destination}`,
               destination,
               arrival,
               minutes: minutesUntil(arrival)
@@ -244,6 +243,7 @@
             mode: 'bus',
             stopId: prediction.stpid,
             stopName: prediction.stpnm || '',
+            stopCategory: 'Bus Stop',
             route: prediction.rt || 'Bus',
             direction: prediction.rtdir || 'Inbound',
             destination: prediction.des || '',
@@ -438,10 +438,10 @@
 
     return L.divIcon({
       className: 'stop-marker-wrapper',
-      html: `<span class="stop-marker" style="background:${markerBackground(stop)}"></span>`,
-      iconSize: [20, 20],
-      iconAnchor: [10, 10],
-      popupAnchor: [0, -8]
+      html: `<span class="stop-marker" style="background:${markerBackground(stop)}"><span class="stop-marker-emoji">🚆</span></span>`,
+      iconSize: [30, 30],
+      iconAnchor: [15, 15],
+      popupAnchor: [0, -12]
     });
   }
 
@@ -517,7 +517,7 @@
       return 'arriving';
     }
 
-    return 'arriving in';
+    return 'in';
   }
 
   function etaValueText(minutes) {
@@ -537,24 +537,24 @@
       return '';
     }
 
-    return minutes === 1 ? 'minute' : 'minutes';
+    return minutes === 1 ? 'min' : 'min';
   }
 
   function etaTimingClass(etaMinutes, walkMinutes) {
     if (!Number.isFinite(etaMinutes) || !Number.isFinite(walkMinutes)) {
-      return 'eta-blue';
+      return 'eta-normal';
     }
 
     if (etaMinutes <= 0 || etaMinutes < walkMinutes) {
-      return 'eta-red';
+      return 'eta-too-far';
     }
 
     const delta = etaMinutes - walkMinutes;
     if (delta >= 1 && delta <= 3) {
-      return 'eta-orange';
+      return 'eta-near';
     }
 
-    return 'eta-blue';
+    return 'eta-normal';
   }
 
   function compactClock(date) {
@@ -582,7 +582,7 @@
 
   function walkingAwayText(miles) {
     const walkMinutes = walkingMinutesFromMiles(miles);
-    return walkMinutes === 1 ? '1 min away' : `${walkMinutes} min away`;
+    return walkMinutes === 1 ? '1 min away' : `${walkMinutes} min walk`;
   }
 
   function distanceWithWalkText(miles) {
@@ -626,14 +626,6 @@
 
     const points = [[userLocation.latitude, userLocation.longitude]];
 
-    L.circle([userLocation.latitude, userLocation.longitude], {
-      radius: SEARCH_RADIUS_METERS,
-      color: '#1f6feb',
-      weight: 2,
-      dashArray: '6 6',
-      fillOpacity: 0.04
-    }).addTo(markerLayer);
-
     L.circleMarker([userLocation.latitude, userLocation.longitude], {
       radius: 7,
       color: '#ffffff',
@@ -658,8 +650,8 @@
     }
 
     map.fitBounds(points, {
-      padding: [32, 32],
-      maxZoom: 16
+      padding: [10, 10],
+      maxZoom: 19
     });
   }
 
@@ -773,80 +765,141 @@
     .sort((a, b) => a.distanceMiles - b.distanceMiles)
     .map((stop) => {
       const walkMinutes = walkingMinutesFromMiles(stop.distanceMiles);
-      const groupedByDirection = new Map();
+      const normalizeEtas = (predictions) =>
+        [...predictions]
+          .sort((a, b) => {
+            const left = a.arrival?.getTime?.() ?? Number.MAX_SAFE_INTEGER;
+            const right = b.arrival?.getTime?.() ?? Number.MAX_SAFE_INTEGER;
+            return left - right;
+          })
+          .slice(0, 2)
+          .map((eta) => ({
+            minutes: eta.minutes,
+            prefixText: arrivalPrefixText(eta.minutes),
+            clockText: compactClock(eta.arrival),
+            timingClass: etaTimingClass(eta.minutes, walkMinutes),
+            sortTime: eta.arrival?.getTime?.() ?? Number.MAX_SAFE_INTEGER
+          }));
 
-      for (const prediction of stop.predictions ?? []) {
-        const routeName = String(prediction.route);
-        const directionLabel =
-          stop.type === 'bus' ? busDirectionOnly(prediction) : destinationOrDirection(prediction);
-        const directionGroup = groupedByDirection.get(directionLabel) ?? {
-          direction: directionLabel,
-          routes: new Map()
-        };
-        const routeGroup = directionGroup.routes.get(routeName) ?? {
-          route: routeName,
-          typeLabel: stop.type === 'train' ? 'Train' : 'Bus',
-          etas: []
-        };
-        routeGroup.etas.push(prediction);
-        directionGroup.routes.set(routeName, routeGroup);
-        groupedByDirection.set(directionLabel, directionGroup);
-      }
+      let directions = [];
+      let routes = [];
 
-      const directions = [...groupedByDirection.values()]
-        .map((directionGroup) => ({
-          direction: directionGroup.direction,
-          routes: [...directionGroup.routes.values()]
-            .map((routeGroup) => ({
-              route: routeGroup.route,
-              typeLabel: routeGroup.typeLabel,
-              etas: [...routeGroup.etas]
-                .sort((a, b) => {
-                  const left = a.arrival?.getTime?.() ?? Number.MAX_SAFE_INTEGER;
-                  const right = b.arrival?.getTime?.() ?? Number.MAX_SAFE_INTEGER;
-                  return left - right;
-                })
-                .slice(0, 2)
-                .map((eta) => ({
-                  minutes: eta.minutes,
-                  prefixText: arrivalPrefixText(eta.minutes),
-                  clockText: compactClock(eta.arrival),
-                  timingClass: etaTimingClass(eta.minutes, walkMinutes),
-                  sortTime: eta.arrival?.getTime?.() ?? Number.MAX_SAFE_INTEGER
-                }))
-            }))
-            .sort((a, b) => {
-              const routeCompare = a.route.localeCompare(b.route, undefined, {
-                numeric: true,
-                sensitivity: 'base'
-              });
-              if (routeCompare !== 0) {
-                return routeCompare;
-              }
-              const left = a.etas[0]?.sortTime ?? Number.MAX_SAFE_INTEGER;
-              const right = b.etas[0]?.sortTime ?? Number.MAX_SAFE_INTEGER;
-              return left - right;
-            })
-        }))
-        .sort((a, b) => {
-          const directionCompare = a.direction.localeCompare(b.direction, undefined, {
-            numeric: true,
-            sensitivity: 'base'
+      if (stop.type === 'train') {
+        const groupedByRoute = new Map();
+
+        for (const prediction of stop.predictions ?? []) {
+          const routeName = String(prediction.route);
+          const directionLabel = destinationOrDirection(prediction);
+          const routeGroup = groupedByRoute.get(routeName) ?? {
+            route: routeName,
+            typeLabel: 'Line',
+            destinations: new Map()
+          };
+          const destinationGroup = routeGroup.destinations.get(directionLabel) ?? [];
+          destinationGroup.push(prediction);
+          routeGroup.destinations.set(directionLabel, destinationGroup);
+          groupedByRoute.set(routeName, routeGroup);
+        }
+
+        routes = [...groupedByRoute.values()]
+          .map((routeGroup) => ({
+            route: routeGroup.route,
+            typeLabel: routeGroup.typeLabel,
+            destinations: [...routeGroup.destinations.entries()]
+              .map(([direction, destinationPredictions]) => ({
+                direction,
+                etas: normalizeEtas(destinationPredictions)
+              }))
+              .sort((a, b) => {
+                const directionCompare = a.direction.localeCompare(b.direction, undefined, {
+                  numeric: true,
+                  sensitivity: 'base'
+                });
+                if (directionCompare !== 0) {
+                  return directionCompare;
+                }
+                const left = a.etas[0]?.sortTime ?? Number.MAX_SAFE_INTEGER;
+                const right = b.etas[0]?.sortTime ?? Number.MAX_SAFE_INTEGER;
+                return left - right;
+              })
+          }))
+          .sort((a, b) => {
+            const routeCompare = a.route.localeCompare(b.route, undefined, {
+              numeric: true,
+              sensitivity: 'base'
+            });
+            if (routeCompare !== 0) {
+              return routeCompare;
+            }
+            const left = a.destinations[0]?.etas[0]?.sortTime ?? Number.MAX_SAFE_INTEGER;
+            const right = b.destinations[0]?.etas[0]?.sortTime ?? Number.MAX_SAFE_INTEGER;
+            return left - right;
           });
-          if (directionCompare !== 0) {
-            return directionCompare;
-          }
-          const left = a.routes[0]?.etas[0]?.sortTime ?? Number.MAX_SAFE_INTEGER;
-          const right = b.routes[0]?.etas[0]?.sortTime ?? Number.MAX_SAFE_INTEGER;
-          return left - right;
-        });
+      } else {
+        const groupedByDirection = new Map();
+
+        for (const prediction of stop.predictions ?? []) {
+          const routeName = String(prediction.route);
+          const directionLabel = busDirectionOnly(prediction);
+          const directionGroup = groupedByDirection.get(directionLabel) ?? {
+            direction: directionLabel,
+            routes: new Map()
+          };
+          const routeGroup = directionGroup.routes.get(routeName) ?? {
+            route: routeName,
+            typeLabel: 'Bus',
+            etas: []
+          };
+          routeGroup.etas.push(prediction);
+          directionGroup.routes.set(routeName, routeGroup);
+          groupedByDirection.set(directionLabel, directionGroup);
+        }
+
+        directions = [...groupedByDirection.values()]
+          .map((directionGroup) => ({
+            direction: directionGroup.direction,
+            routes: [...directionGroup.routes.values()]
+              .map((routeGroup) => ({
+                route: routeGroup.route,
+                typeLabel: routeGroup.typeLabel,
+                etas: normalizeEtas(routeGroup.etas)
+              }))
+              .sort((a, b) => {
+                const routeCompare = a.route.localeCompare(b.route, undefined, {
+                  numeric: true,
+                  sensitivity: 'base'
+                });
+                if (routeCompare !== 0) {
+                  return routeCompare;
+                }
+                const left = a.etas[0]?.sortTime ?? Number.MAX_SAFE_INTEGER;
+                const right = b.etas[0]?.sortTime ?? Number.MAX_SAFE_INTEGER;
+                return left - right;
+              })
+          }))
+          .sort((a, b) => {
+            const directionCompare = a.direction.localeCompare(b.direction, undefined, {
+              numeric: true,
+              sensitivity: 'base'
+            });
+            if (directionCompare !== 0) {
+              return directionCompare;
+            }
+            const left = a.routes[0]?.etas[0]?.sortTime ?? Number.MAX_SAFE_INTEGER;
+            const right = b.routes[0]?.etas[0]?.sortTime ?? Number.MAX_SAFE_INTEGER;
+            return left - right;
+          });
+      }
 
       return {
         stopId: stop.stopId,
-        icon: stop.type === 'train' ? '🚆' : '🚌',
+        type: stop.type,
+        icon: stop.type === 'train' ? '🚉 ' : '🚌',
         distanceText: distanceOnlyText(stop.distanceMiles),
         walkText: walkingAwayText(stop.distanceMiles),
         stopName: stop.displayName,
+        stopCategory: stop.type === 'train' ? 'Station' : 'Bus Stop',
+        routes,
         directions
       };
     });
@@ -912,43 +965,89 @@
         {#each upcomingStops as stop}
           <li class="arrival-item">
             <div class="stop-header">
-              <span class="arrival-emoji">{stop.icon}</span>
-              <span class="distance">{stop.distanceText}</span>
-              <span>({stop.walkText}):</span>
-              <span class="stop-name">{stop.stopName}</span>
+
+              <span class="stop-name">
+                <span class="arrival-emoji">{stop.icon}</span>
+                  <span class="name">{stop.stopName}</span>
+                  <span class="category">{stop.stopCategory}</span>
+
+
+              </span>
+
+              <span class="stop-info">
+                <span class="distance">{stop.distanceText}</span>
+                <span>({stop.walkText})</span>
+
+              </span>
+
             </div>
+
             <ul class="route-list">
-              {#each stop.directions as direction}
-                <li class="direction-group-item">
-                  <span class="route-dash">-</span>
-                  <span class="arrival-emphasis">{direction.direction}:</span>
-                  <ul class="direction-list">
-                    {#each direction.routes as route}
-                      <li class="route-item">
-                        <span class="route-name">{route.route}</span>
-                        <span>{route.typeLabel}</span>
-                        {#each route.etas as eta, etaIndex}
-                          {#if etaIndex === 0}
-                            <span class="eta-prefix">{eta.prefixText}</span>
-                            <span class={`eta-part ${eta.timingClass}`}>{etaValueText(eta.minutes)}</span>
-                            {#if etaUnitText(eta.minutes)}
-                              <span class="eta-unit">{etaUnitText(eta.minutes)}</span>
+              {#if stop.type === 'train'}
+                {#each stop.routes as route}
+                  <li class="direction-group-item">
+                    <span class="route-name train {route.route.toLowerCase()}">
+                    {route.route}
+                    <span class="route-type">{route.typeLabel}</span>
+        </span>
+                    <ul class="direction-list">
+                      {#each route.destinations as destination}
+                        <li class="route-item">
+                          <span class="arrival-emphasis">{destination.direction}</span>
+                          {#each destination.etas as eta, etaIndex}
+                            {#if etaIndex === 0}
+                              <span class="eta-prefix">{eta.prefixText}</span>
+                              <span class={`eta-part ${eta.timingClass}`}>{etaValueText(eta.minutes)}</span>
+                              {#if etaUnitText(eta.minutes)}
+                                <span class="eta-unit">{etaUnitText(eta.minutes)}</span>
+                              {/if}
+                              <span class={`eta-part clock ${eta.timingClass}`}>({eta.clockText})</span>
+                            {:else}
+                              <span class="eta-join">and</span>
+                              <span class={`eta-part ${eta.timingClass}`}>{etaValueText(eta.minutes)}</span>
+                              {#if etaUnitText(eta.minutes)}
+                                <span class="eta-unit">{etaUnitText(eta.minutes)}</span>
+                              {/if}
+                              <span class={`eta-part clock ${eta.timingClass}`}>({eta.clockText})</span>
                             {/if}
-                            <span class={`eta-part ${eta.timingClass}`}>({eta.clockText})</span>
-                          {:else}
-                            <span class="eta-join">and</span>
-                            <span class={`eta-part ${eta.timingClass}`}>{etaValueText(eta.minutes)}</span>
-                            {#if etaUnitText(eta.minutes)}
-                              <span class="eta-unit">{etaUnitText(eta.minutes)}</span>
+                          {/each}
+                        </li>
+                      {/each}
+                    </ul>
+                  </li>
+                {/each}
+              {:else}
+                {#each stop.directions as direction}
+                  <li class="direction-group-item">
+                    <span class="arrival-emphasis">{direction.direction}:</span>
+                    <ul class="direction-list">
+                      {#each direction.routes as route}
+                        <li class="route-item">
+                          <span class="route-name bus">{route.route}</span>
+                          <span>{route.typeLabel}</span>
+                          {#each route.etas as eta, etaIndex}
+                            {#if etaIndex === 0}
+                              <span class="eta-prefix">{eta.prefixText}</span>
+                              <span class={`eta-part ${eta.timingClass}`}>{etaValueText(eta.minutes)}</span>
+                              {#if etaUnitText(eta.minutes)}
+                                <span class="eta-unit">{etaUnitText(eta.minutes)}</span>
+                              {/if}
+                              <span class={`eta-part clock ${eta.timingClass}`}>({eta.clockText})</span>
+                            {:else}
+                              <span class="eta-join">and</span>
+                              <span class={`eta-part ${eta.timingClass}`}>{etaValueText(eta.minutes)}</span>
+                              {#if etaUnitText(eta.minutes)}
+                                <span class="eta-unit">{etaUnitText(eta.minutes)}</span>
+                              {/if}
+                              <span class={`eta-part clock ${eta.timingClass}`}>({eta.clockText})</span>
                             {/if}
-                            <span class={`eta-part ${eta.timingClass}`}>({eta.clockText})</span>
-                          {/if}
-                        {/each}
-                      </li>
-                    {/each}
-                  </ul>
-                </li>
-              {/each}
+                          {/each}
+                        </li>
+                      {/each}
+                    </ul>
+                  </li>
+                {/each}
+              {/if}
             </ul>
           </li>
         {/each}
@@ -973,12 +1072,20 @@
   }
 
   :global(.stop-marker) {
-    display: block;
-    width: 16px;
-    height: 16px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
     border-radius: 999px;
     border: 2px solid #ffffff;
-    box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.3);
+    box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.35);
+  }
+
+  :global(.stop-marker-emoji) {
+    font-size: 13px;
+    line-height: 1;
+    filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.45));
   }
 
   :global(.bus-marker) {
@@ -1150,6 +1257,9 @@
     margin-right: 6px;
   }
 
+  .arrival-record {
+    margin-bottom: 1.0em;
+  }
   .stop-header {
     display: flex;
     flex-wrap: wrap;
@@ -1171,14 +1281,51 @@
     align-items: flex-start;
   }
 
-  .route-dash {
-    margin-left: -12px;
-    width: 8px;
-  }
 
   .route-name {
-    font-weight: 700;
+    font-weight: 400;
+    padding: 0.1rem 0.2rem;
+    border: thin solid gray;
   }
+
+  .route-name.bus{
+    font-weight: 600;
+    border-radius: 5%;
+  }
+
+  .route-name.train{
+     font-weight: 600;
+     color: white;
+  }
+
+ .route-name.blue{
+    background: #0000cc;
+  }
+
+  .route-name.brown{
+    background: brown;
+  }
+
+
+ .route-name.green{
+    background: #00cc00;
+  }
+
+ .route-name.orange{
+    background: orange;
+  }
+
+ .route-name.purple{
+    background: purple;
+  }
+  .route-name.red{
+    background: #cc0000;
+  }
+
+  .route-name.yellow{
+    background: yellow;
+  }
+
 
   .arrival-emphasis {
     font-weight: 600;
@@ -1197,10 +1344,15 @@
     flex-wrap: wrap;
     gap: 4px;
     margin-top: 1px;
+    margin-bottom: 0.5rem;
   }
 
   .eta-part {
     white-space: nowrap;
+  }
+
+  .eta-part.clock {
+    font-size: 0.8rem;
   }
 
   .eta-prefix {
@@ -1215,32 +1367,36 @@
     color: #344054;
   }
 
-  .eta-red,
-  :global(.popup .eta-red) {
-    color: #b42318;
-    font-weight: 700;
+  .eta-too-far,
+  :global(.popup .eta-too-far) {
+    color: #770022;
+    font-weight: 400;
   }
 
-  .eta-orange,
-  :global(.popup .eta-orange) {
-    color: #b54708;
-    font-weight: 700;
+  .eta-near,
+  :global(.popup .eta-near) {
+    color: #665522;
+    font-weight: 600;
   }
 
-  .eta-blue,
-  :global(.popup .eta-blue) {
-    color: #175cd3;
-    font-weight: 700;
+  .eta-normal,
+  :global(.popup .eta-normal) {
+    color: #222222;
+    font-weight: 400;
   }
 
   .stop-name {
+    font-size: 1.1em;
     font-weight: 700;
     color: #0f172a;
   }
 
+  .stop-info{
+    margin-left: 0.5em;
+  }
   .distance {
     color: #475569;
-    font-weight: 600;
+    font-weight: 400;
   }
 
   .empty {
