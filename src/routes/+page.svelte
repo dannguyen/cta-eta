@@ -917,8 +917,9 @@
 </svelte:head>
 
 <main>
-  <header>
-    <h1>CTA ETA: Chicago Transit Nearest You</h1>
+  <header class="site-title">
+    <h1>CTA ETA</h1>
+    <h2>Chicago Transit Nearest You</h2>
   </header>
 
   <section class="top-layout">
@@ -1199,6 +1200,7 @@
   }
 
   .legend {
+    display: none;
     margin: 0;
   }
 
@@ -1469,6 +1471,16 @@
     .legend {
       grid-column: 2;
       grid-row: 2;
+    }
+  }
+
+  header.site-title{
+    h1{
+      margin-bottom: 0.0em;
+    }
+    h2{
+      font-size: 1em;
+      margin-top: 0.3em;
     }
   }
 
