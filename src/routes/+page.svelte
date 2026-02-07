@@ -17,7 +17,7 @@
     withinRadius
   } from '$lib/cta';
 
-  const SEARCH_RADIUS_MILES = 0.5;
+  const SEARCH_RADIUS_MILES = 1;
   const WALK_SPEED_MPH = 2;
   const CTA_PROXY_BASE = String(import.meta.env.VITE_CTA_PROXY_BASE ?? '').trim();
 
@@ -510,14 +510,14 @@
 
   function arrivalPrefixText(minutes) {
     if (minutes === null || minutes === undefined) {
-      return 'arriving at';
+      return 'arrives at';
     }
 
     if (minutes <= 0) {
-      return 'arriving';
+      return 'arrives';
     }
 
-    return 'in';
+    return 'arrives in';
   }
 
   function etaValueText(minutes) {
@@ -906,7 +906,7 @@
 </script>
 
 <svelte:head>
-  <title>CTA ETA Web App</title>
+  <title>CTA ETA: Chicago Transit ETAs Near You</title>
   <meta
     name="description"
     content="Nearby CTA train and bus arrival times, based on your current location."
@@ -915,12 +915,11 @@
 
 <main>
   <header>
-    <h1>CTA Nearby ETAs</h1>
-    <p>
-      Nearest CTA rail stops and bus stops within
-      <strong>{SEARCH_RADIUS_MILES.toFixed(1)} mile</strong>
-      of your current location.
-    </p>
+    <h1>CTA ETA: Chicago Transit Nearest You</h1>
+  </header>
+
+  <section class="top-layout">
+    <section class="top-controls">
     <div class="toolbar">
       <button type="button" on:click={reload} disabled={loading}>Refresh</button>
       {#if loading}
@@ -933,25 +932,26 @@
         </span>
       {/if}
     </div>
-  </header>
-
-  <section class="map-wrap">
-    <div class="map" bind:this={mapContainer}></div>
-  </section>
-
-  {#if legendEntries.length > 0}
-    <section class="legend">
-      <h2>Legend</h2>
-      <div class="chips">
-        {#each legendEntries as item}
-          <span class="chip">
-            <span class="dot" style={`background:${item.color}`}></span>
-            {item.label}
-          </span>
-        {/each}
-      </div>
     </section>
-  {/if}
+
+    <section class="map-wrap">
+      <div class="map" bind:this={mapContainer}></div>
+    </section>
+
+    {#if legendEntries.length > 0}
+      <section class="legend">
+        <h2>Legend</h2>
+        <div class="chips">
+          {#each legendEntries as item}
+            <span class="chip">
+              <span class="dot" style={`background:${item.color}`}></span>
+              {item.label}
+            </span>
+          {/each}
+        </div>
+      </section>
+    {/if}
+  </section>
 
   <section>
     <h2>Upcoming Arrivals</h2>
@@ -994,23 +994,20 @@
                       {#each route.destinations as destination}
                         <li class="route-item">
                           <span class="arrival-emphasis">{destination.direction}</span>
-                          {#each destination.etas as eta, etaIndex}
-                            {#if etaIndex === 0}
-                              <span class="eta-prefix">{eta.prefixText}</span>
-                              <span class={`eta-part ${eta.timingClass}`}>{etaValueText(eta.minutes)}</span>
-                              {#if etaUnitText(eta.minutes)}
-                                <span class="eta-unit">{etaUnitText(eta.minutes)}</span>
-                              {/if}
-                              <span class={`eta-part clock ${eta.timingClass}`}>({eta.clockText})</span>
-                            {:else}
-                              <span class="eta-join">and</span>
-                              <span class={`eta-part ${eta.timingClass}`}>{etaValueText(eta.minutes)}</span>
-                              {#if etaUnitText(eta.minutes)}
-                                <span class="eta-unit">{etaUnitText(eta.minutes)}</span>
-                              {/if}
-                              <span class={`eta-part clock ${eta.timingClass}`}>({eta.clockText})</span>
-                            {/if}
-                          {/each}
+                          <span class="eta-stack">
+                            {#each destination.etas as eta, etaIndex}
+                              <span class="eta-line">
+<!--                                 <span class={`eta-prefix ${etaIndex === 0 ? '' : 'ghost'}`}>
+                                  {etaIndex === 0 ? eta.prefixText : 'arrives in'}
+                                </span>
+ -->                                <span class={`eta-part ${eta.timingClass}`}>{etaValueText(eta.minutes)}</span>
+                                {#if etaUnitText(eta.minutes)}
+                                  <span class="eta-unit">{etaUnitText(eta.minutes)}</span>
+                                {/if}
+                                <span class={`eta-part clock`}>{eta.clockText}</span>
+                              </span>
+                            {/each}
+                          </span>
                         </li>
                       {/each}
                     </ul>
@@ -1025,23 +1022,20 @@
                         <li class="route-item">
                           <span class="route-name bus">{route.route}</span>
                           <span>{route.typeLabel}</span>
-                          {#each route.etas as eta, etaIndex}
-                            {#if etaIndex === 0}
-                              <span class="eta-prefix">{eta.prefixText}</span>
-                              <span class={`eta-part ${eta.timingClass}`}>{etaValueText(eta.minutes)}</span>
-                              {#if etaUnitText(eta.minutes)}
-                                <span class="eta-unit">{etaUnitText(eta.minutes)}</span>
-                              {/if}
-                              <span class={`eta-part clock ${eta.timingClass}`}>({eta.clockText})</span>
-                            {:else}
-                              <span class="eta-join">and</span>
-                              <span class={`eta-part ${eta.timingClass}`}>{etaValueText(eta.minutes)}</span>
-                              {#if etaUnitText(eta.minutes)}
-                                <span class="eta-unit">{etaUnitText(eta.minutes)}</span>
-                              {/if}
-                              <span class={`eta-part clock ${eta.timingClass}`}>({eta.clockText})</span>
-                            {/if}
-                          {/each}
+                          <span class="eta-stack">
+                            {#each route.etas as eta, etaIndex}
+                              <span class="eta-line">
+<!--                                 <span class={`eta-prefix ${etaIndex === 0 ? '' : 'ghost'}`}>
+                                  {etaIndex === 0 ? eta.prefixText : 'arrives in'}
+                                </span>
+ -->                                <span class={`eta-part ${eta.timingClass}`}>{etaValueText(eta.minutes)}</span>
+                                {#if etaUnitText(eta.minutes)}
+                                  <span class="eta-unit">{etaUnitText(eta.minutes)}</span>
+                                {/if}
+                                <span class={`eta-part clock`}>{eta.clockText}</span>
+                              </span>
+                            {/each}
+                          </span>
                         </li>
                       {/each}
                     </ul>
@@ -1147,9 +1141,19 @@
     font-size: clamp(1.6rem, 3vw, 2.2rem);
   }
 
-  header p {
-    margin: 6px 0 14px;
-    color: #4f5b6b;
+  .top-layout {
+    margin-top: 12px;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 12px;
+    align-items: start;
+  }
+
+  .top-controls {
+    border: 1px solid #dbe4ef;
+    border-radius: 12px;
+    background: #ffffff;
+    padding: 10px;
   }
 
   .toolbar {
@@ -1184,18 +1188,18 @@
   }
 
   .map-wrap {
-    margin-top: 16px;
+    margin-top: 0;
   }
 
   .map {
-    height: min(60vh, 560px);
+    height: min(30vh, 300px);
     border-radius: 16px;
     overflow: hidden;
     box-shadow: 0 10px 24px rgba(15, 23, 42, 0.12);
   }
 
   .legend {
-    margin: 14px 0 6px;
+    margin: 0;
   }
 
   .legend h2 {
@@ -1289,6 +1293,7 @@
   }
 
   .route-name.bus{
+    align-self: flex-start;
     font-weight: 600;
     border-radius: 5%;
   }
@@ -1342,9 +1347,24 @@
   .route-item {
     display: flex;
     flex-wrap: wrap;
+    align-items: flex-start;
     gap: 4px;
     margin-top: 1px;
     margin-bottom: 0.5rem;
+  }
+
+  .eta-stack {
+    display: inline-flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 1px;
+  }
+
+  .eta-line {
+    display: inline-flex;
+    align-items: baseline;
+    gap: 4px;
+    white-space: nowrap;
   }
 
   .eta-part {
@@ -1352,18 +1372,21 @@
   }
 
   .eta-part.clock {
-    font-size: 0.8rem;
+    font-size: 0.9rem;
+    margin-left: 0.5rem;
   }
 
   .eta-prefix {
+    display: inline-block;
+    min-width: 58px;
     color: #344054;
+  }
+
+  .eta-prefix.ghost {
+    visibility: hidden;
   }
 
   .eta-unit {
-    color: #344054;
-  }
-
-  .eta-join {
     color: #344054;
   }
 
@@ -1403,6 +1426,29 @@
     color: #5c6676;
     font-size: 0.95rem;
     margin-top: 8px;
+  }
+
+  @media (min-width: 900px) {
+    .top-layout {
+      grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+      column-gap: 16px;
+      row-gap: 12px;
+    }
+
+    .map-wrap {
+      grid-column: 1;
+      grid-row: 1 / span 2;
+    }
+
+    .top-controls {
+      grid-column: 2;
+      grid-row: 1;
+    }
+
+    .legend {
+      grid-column: 2;
+      grid-row: 2;
+    }
   }
 
   @media (max-width: 720px) {
