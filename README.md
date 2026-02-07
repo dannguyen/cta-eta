@@ -9,6 +9,24 @@ Make a one-page static web app that reads the visitor's current geospatial locat
 - Use Svelte 5.0
 - The app should be a static single page app, as it relies on static data files (in static/data) or calling APIs
 
+### Cloudflare Pages + Worker Functions
+
+This repo is configured to call same-origin proxy endpoints at `/api/train` and `/api/bus`.
+Those endpoints are implemented as Cloudflare Pages Functions in:
+
+- `functions/api/train.js`
+- `functions/api/bus.js`
+
+Set these Cloudflare project secrets:
+
+- `TRAIN_API_KEY`
+- `BUS_API_KEY`
+
+Cloudflare Pages build settings:
+
+- Build command: `npm run build`
+- Build output directory: `build`
+
 ### Detailed flow description
 
 - User visits the CTA ETA Webapp page
@@ -81,9 +99,7 @@ The `STOP_ID` value is passed to the Bus tracker `stpid` API parameter
 
 ### APIs
 
-When the visitor loads the web page, the app should call the relevant CTA APIs.
-
-The [keys.toml](keys.toml) file contains my API developer keys for the train and bus API endpoints.
+When the visitor loads the web page, the app should call the relevant CTA APIs via the Cloudflare Functions proxy endpoints (`/api/train` and `/api/bus`), which attach the API keys server-side from Cloudflare secrets.
 
 CTA API Developer homepage: https://www.transitchicago.com/developers/
 
@@ -201,7 +217,5 @@ Each entry in the `eta` array has a `rt` attribute. Use the following key to tra
 • P = Purple
 • Pink = Pink
 • Y = Yellow
-
-
 
 

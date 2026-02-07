@@ -1,5 +1,6 @@
 <script>
   import { onMount } from 'svelte';
+  import { base } from '$app/paths';
   import 'leaflet/dist/leaflet.css';
   import {
     TRAIN_LINE_META,
@@ -10,7 +11,6 @@
     minutesUntil,
     parseBusApiDate,
     parseBusStops,
-    parseKeysFile,
     parseTrainApiDate,
     parseTrainStations,
     trainDisplayFromRoute,
@@ -20,8 +20,7 @@
   const SEARCH_RADIUS_MILES = 0.5;
   const SEARCH_RADIUS_METERS = SEARCH_RADIUS_MILES * 1609.344;
   const WALK_SPEED_MPH = 2;
-  const TRAIN_API_URL = 'https://lapi.transitchicago.com/api/1.0/ttarrivals.aspx';
-  const BUS_API_URL = 'https://www.ctabustracker.com/bustime/api/v3/getpredictions';
+  const CTA_PROXY_BASE = String(import.meta.env.VITE_CTA_PROXY_BASE ?? '').trim();
 
   let loading = false;
   let loadingMessage = '';
@@ -39,14 +38,19 @@
 
   function withBasePath(path) {
     const normalizedPath = String(path).replace(/^\/+/, '');
+    const normalizedBase = base ? (base.endsWith('/') ? base.slice(0, -1) : base) : '';
+    return `${normalizedBase}/${normalizedPath}`;
+  }
 
-    if (typeof document !== 'undefined') {
-      return new URL(normalizedPath, document.baseURI).toString();
+  function apiEndpoint(path) {
+    const normalizedPath = String(path).replace(/^\/+/, '');
+    if (CTA_PROXY_BASE) {
+      const normalizedProxyBase = CTA_PROXY_BASE.endsWith('/')
+        ? CTA_PROXY_BASE
+        : `${CTA_PROXY_BASE}/`;
+      return new URL(normalizedPath, normalizedProxyBase).toString();
     }
-
-    const base = import.meta.env.BASE_URL || '/';
-    const normalizedBase = base.endsWith('/') ? base : `${base}/`;
-    return `${normalizedBase}${normalizedPath}`;
+    return `/${normalizedPath}`;
   }
 
   async function getUserLocation() {
@@ -80,22 +84,7 @@
     return response.text();
   }
 
-  async function loadApiKeys() {
-    if (import.meta.env.DEV) {
-      try {
-        return parseKeysFile(await fetchText(withBasePath('keys.toml')));
-      } catch {
-        return { train: '', bus: '' };
-      }
-    }
-
-    return {
-      train: String(import.meta.env.VITE_TRAIN_API_KEY ?? '').trim(),
-      bus: String(import.meta.env.VITE_BUS_API_KEY ?? '').trim()
-    };
-  }
-
-  async function fetchTrainPredictions(stops, trainApiKey) {
+  async function fetchTrainPredictions(stops) {
     const predictionTime = (prediction) => {
       if (prediction.arrival instanceof Date && !Number.isNaN(prediction.arrival.getTime())) {
         return prediction.arrival.getTime();
@@ -114,9 +103,7 @@
 
     const perStationPredictions = await Promise.all(
       stops.map(async (stop) => {
-        const url = new URL(TRAIN_API_URL);
-        url.searchParams.set('key', trainApiKey);
-        url.searchParams.set('outputType', 'JSON');
+        const url = new URL(apiEndpoint('api/train'), window.location.origin);
         url.searchParams.set('mapid', stop.stationId ?? stop.stopId);
 
         try {
@@ -209,7 +196,7 @@
     };
   }
 
-  async function fetchBusPredictions(stops, busApiKey) {
+  async function fetchBusPredictions(stops) {
     const results = new Map(stops.map((stop) => [stop.stopId, []]));
     const allPredictions = [];
     const stopIds = stops.map((stop) => stop.stopId);
@@ -228,9 +215,7 @@
     };
 
     for (const idsChunk of chunk(stopIds, 10)) {
-      const url = new URL(BUS_API_URL);
-      url.searchParams.set('key', busApiKey);
-      url.searchParams.set('format', 'json');
+      const url = new URL(apiEndpoint('api/bus'), window.location.origin);
       url.searchParams.set('stpid', idsChunk.join(','));
       url.searchParams.set('top', '40');
 
@@ -686,16 +671,6 @@
     nearbyStops = [];
 
     try {
-      loadingMessage = 'Loading CTA API keys...';
-      const keys = await loadApiKeys();
-      if (!keys.train || !keys.bus) {
-        throw new Error(
-          import.meta.env.DEV
-            ? 'Could not find CTA API keys in static/keys.toml.'
-            : 'Could not find CTA API keys in build env (VITE_TRAIN_API_KEY / VITE_BUS_API_KEY).'
-        );
-      }
-
       loadingMessage = 'Requesting your location...';
       userLocation = await getUserLocation();
       if (currentNonce !== loadNonce) {
@@ -722,8 +697,8 @@
 
       loadingMessage = 'Loading train and bus ETAs...';
       const [trainData, busData] = await Promise.all([
-        fetchTrainPredictions(nearbyTrainStations, keys.train),
-        fetchBusPredictions(candidateBusStops, keys.bus)
+        fetchTrainPredictions(nearbyTrainStations),
+        fetchBusPredictions(candidateBusStops)
       ]);
       if (currentNonce !== loadNonce) {
         return;
