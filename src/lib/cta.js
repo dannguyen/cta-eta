@@ -54,8 +54,12 @@ export function parseKeysFile(raw) {
       value = value.slice(1, -1);
     }
 
-    if (key === 'train' || key === 'bus') {
-      keys[key] = value;
+    if (key === 'train' || key === 'train_api_key') {
+      keys.train = value;
+    }
+
+    if (key === 'bus' || key === 'bus_api_key') {
+      keys.bus = value;
     }
   }
 

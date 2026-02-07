@@ -1,7 +1,6 @@
 <script>
   import { onMount } from 'svelte';
   import 'leaflet/dist/leaflet.css';
-  import keysRaw from '../../keys.toml?raw';
   import {
     TRAIN_LINE_META,
     chunk,
@@ -21,6 +20,8 @@
   const SEARCH_RADIUS_MILES = 0.5;
   const SEARCH_RADIUS_METERS = SEARCH_RADIUS_MILES * 1609.344;
   const WALK_SPEED_MPH = 2;
+  const TRAIN_API_URL = 'https://lapi.transitchicago.com/api/1.0/ttarrivals.aspx';
+  const BUS_API_URL = 'https://www.ctabustracker.com/bustime/api/v3/getpredictions';
 
   let loading = false;
   let loadingMessage = '';
@@ -35,6 +36,18 @@
   let L;
 
   let loadNonce = 0;
+
+  function withBasePath(path) {
+    const normalizedPath = String(path).replace(/^\/+/, '');
+
+    if (typeof document !== 'undefined') {
+      return new URL(normalizedPath, document.baseURI).toString();
+    }
+
+    const base = import.meta.env.BASE_URL || '/';
+    const normalizedBase = base.endsWith('/') ? base : `${base}/`;
+    return `${normalizedBase}${normalizedPath}`;
+  }
 
   async function getUserLocation() {
     if (!navigator.geolocation) {
@@ -67,6 +80,21 @@
     return response.text();
   }
 
+  async function loadApiKeys() {
+    if (import.meta.env.DEV) {
+      try {
+        return parseKeysFile(await fetchText(withBasePath('keys.toml')));
+      } catch {
+        return { train: '', bus: '' };
+      }
+    }
+
+    return {
+      train: String(import.meta.env.VITE_TRAIN_API_KEY ?? '').trim(),
+      bus: String(import.meta.env.VITE_BUS_API_KEY ?? '').trim()
+    };
+  }
+
   async function fetchTrainPredictions(stops, trainApiKey) {
     const predictionTime = (prediction) => {
       if (prediction.arrival instanceof Date && !Number.isNaN(prediction.arrival.getTime())) {
@@ -86,7 +114,7 @@
 
     const perStationPredictions = await Promise.all(
       stops.map(async (stop) => {
-        const url = new URL('/api/train/api/1.0/ttarrivals.aspx', window.location.origin);
+        const url = new URL(TRAIN_API_URL);
         url.searchParams.set('key', trainApiKey);
         url.searchParams.set('outputType', 'JSON');
         url.searchParams.set('mapid', stop.stationId ?? stop.stopId);
@@ -200,7 +228,7 @@
     };
 
     for (const idsChunk of chunk(stopIds, 10)) {
-      const url = new URL('/api/bus/bustime/api/v3/getpredictions', window.location.origin);
+      const url = new URL(BUS_API_URL);
       url.searchParams.set('key', busApiKey);
       url.searchParams.set('format', 'json');
       url.searchParams.set('stpid', idsChunk.join(','));
@@ -658,9 +686,14 @@
     nearbyStops = [];
 
     try {
-      const keys = parseKeysFile(keysRaw);
+      loadingMessage = 'Loading CTA API keys...';
+      const keys = await loadApiKeys();
       if (!keys.train || !keys.bus) {
-        throw new Error('Could not find train and bus keys in keys.toml.');
+        throw new Error(
+          import.meta.env.DEV
+            ? 'Could not find CTA API keys in static/keys.toml.'
+            : 'Could not find CTA API keys in build env (VITE_TRAIN_API_KEY / VITE_BUS_API_KEY).'
+        );
       }
 
       loadingMessage = 'Requesting your location...';
@@ -671,8 +704,8 @@
 
       loadingMessage = 'Loading CTA stop datasets...';
       const [trainCsv, busCsv] = await Promise.all([
-        fetchText('/data/cta-train-stations.csv'),
-        fetchText('/data/cta-bus-stops.csv')
+        fetchText(withBasePath('data/cta-train-stations.csv')),
+        fetchText(withBasePath('data/cta-bus-stops.csv'))
       ]);
       if (currentNonce !== loadNonce) {
         return;
