@@ -130,6 +130,7 @@
               destination,
               arrival,
               minutes: minutesUntil(arrival)
+
             });
           }
 
@@ -249,6 +250,7 @@
             destination: prediction.des || '',
             arrival,
             minutes
+
           };
 
           allPredictions.push(normalized);
@@ -775,6 +777,7 @@
           .slice(0, 2)
           .map((eta) => ({
             minutes: eta.minutes,
+            descriptor: eta.minutes <= 0 ? 'now' : 'later',
             prefixText: arrivalPrefixText(eta.minutes),
             clockText: compactClock(eta.arrival),
             timingClass: etaTimingClass(eta.minutes, walkMinutes),
@@ -992,15 +995,13 @@
         </span>
                     <ul class="direction-list">
                       {#each route.destinations as destination}
-                        <li class="route-item">
-                          <span class="arrival-emphasis">{destination.direction}</span>
+                        <li class="route-item train-row">
+                          <span class="route-label arrival-emphasis">{destination.direction}</span>
                           <span class="eta-stack">
-                            {#each destination.etas as eta, etaIndex}
+                            {#each destination.etas as eta}
                               <span class="eta-line">
-<!--                                 <span class={`eta-prefix ${etaIndex === 0 ? '' : 'ghost'}`}>
-                                  {etaIndex === 0 ? eta.prefixText : 'arrives in'}
-                                </span>
- -->                                <span class={`eta-part ${eta.timingClass}`}>{etaValueText(eta.minutes)}</span>
+                                <span class={`eta-part eta-value ${eta.timingClass} ${eta.descriptor}`}>
+                                {etaValueText(eta.minutes)}</span>
                                 {#if etaUnitText(eta.minutes)}
                                   <span class="eta-unit">{etaUnitText(eta.minutes)}</span>
                                 {/if}
@@ -1016,19 +1017,18 @@
               {:else}
                 {#each stop.directions as direction}
                   <li class="direction-group-item">
-                    <span class="arrival-emphasis">{direction.direction}:</span>
+                    <span class="arrival-emphasis">{direction.direction}</span>
                     <ul class="direction-list">
                       {#each direction.routes as route}
-                        <li class="route-item">
-                          <span class="route-name bus">{route.route}</span>
-                          <span>{route.typeLabel}</span>
+                        <li class="route-item bus-row">
+                          <span class="route-label">
+                            <span class="route-name bus">{route.route}</span>
+                            <span class="route-type">{route.typeLabel}</span>
+                          </span>
                           <span class="eta-stack">
-                            {#each route.etas as eta, etaIndex}
+                            {#each route.etas as eta}
                               <span class="eta-line">
-<!--                                 <span class={`eta-prefix ${etaIndex === 0 ? '' : 'ghost'}`}>
-                                  {etaIndex === 0 ? eta.prefixText : 'arrives in'}
-                                </span>
- -->                                <span class={`eta-part ${eta.timingClass}`}>{etaValueText(eta.minutes)}</span>
+                                <span class={`eta-part eta-value ${eta.timingClass} ${eta.descriptor}`}>{etaValueText(eta.minutes)}</span>
                                 {#if etaUnitText(eta.minutes)}
                                   <span class="eta-unit">{etaUnitText(eta.minutes)}</span>
                                 {/if}
@@ -1274,7 +1274,7 @@
   .route-list {
     list-style: none;
     margin: 4px 0 0 0;
-    padding: 0 0 0 16px;
+    padding: 0 0 0 0px;
   }
 
   .direction-group-item {
@@ -1339,31 +1339,43 @@
 
   .direction-list {
     list-style: none;
-    margin: 0;
-    padding: 0 0 0 10px;
+    margin: 0 0 0.5rem 0;
+    padding: 0 0 0 0px;
     width: 100%;
   }
 
   .route-item {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: flex-start;
-    gap: 4px;
+    display: grid;
+    grid-template-columns: minmax(130px, max-content) minmax(0, 1fr);
+    align-items: start;
+    column-gap: 10px;
     margin-top: 1px;
-    margin-bottom: 0.5rem;
+    margin-bottom: 0.2rem;
+  }
+
+  .route-label {
+    display: inline-flex;
+    align-items: baseline;
+    gap: 6px;
+    white-space: nowrap;
+  }
+
+  .route-type {
+
   }
 
   .eta-stack {
-    display: inline-flex;
-    flex-direction: column;
+    display: inline-grid;
+    grid-auto-rows: min-content;
     align-items: flex-start;
-    gap: 1px;
+    row-gap: 2px;
   }
 
   .eta-line {
-    display: inline-flex;
+    display: inline-grid;
+    grid-template-columns: minmax(2ch, max-content) max-content max-content;
     align-items: baseline;
-    gap: 4px;
+    column-gap: 4px;
     white-space: nowrap;
   }
 
@@ -1371,9 +1383,18 @@
     white-space: nowrap;
   }
 
+  .eta-value {
+    text-align: right;
+  }
+
+  .eta-value.now {
+     margin-left: 0.5ch;
+  }
+
   .eta-part.clock {
     font-size: 0.9rem;
-    margin-left: 0.5rem;
+    font-weight: 300;
+    padding-left: 0.3rem;
   }
 
   .eta-prefix {
@@ -1468,7 +1489,7 @@
     }
 
     .route-list {
-      padding-left: 12px;
+      padding-left: 0px;
     }
   }
 </style>
