@@ -13,7 +13,7 @@
     getDistinctBusRoutes,
     getDistinctTrainRoutes
   } from '$lib/arrivals/grouping';
-  import { markerIcon, popupHtml } from '$lib/map/markers';
+  import { markerIcon, popupHtml } from '$lib/mapping';
   import TransitStopItem from '$lib/components/TransitStop.svelte';
   import DebugPanel from '$lib/components/DebugPanel.svelte';
 
@@ -90,7 +90,11 @@
       .bindPopup('Your location')
       .addTo(markerLayer);
 
-    for (const stop of nearbyStops) {
+    for (const stop of upcomingTransitStops) {
+      if (!Number.isFinite(stop.latitude) || !Number.isFinite(stop.longitude)) {
+        continue;
+      }
+
       const marker = L.marker([stop.latitude, stop.longitude], {
         icon: markerIcon(L, stop)
       });
@@ -238,13 +242,13 @@
   };
 
   $: visibleTrainLineCodes = new Set(
-    nearbyStops
+    upcomingTransitStops
       .filter((stop) => stop.type === 'train')
-      .flatMap((stop) => stop.lines.map((line) => line.code))
+      .flatMap((stop) => stop.lineColors().map((line) => line.code))
   );
 
   $: legendEntries = [
-    ...(nearbyStops.some((stop) => stop.type === 'bus')
+    ...(upcomingTransitStops.some((stop) => stop.type === 'bus')
       ? [{ label: 'Bus stop', color: '#151515' }]
       : []),
     ...Object.values(TRAIN_LINE_META)

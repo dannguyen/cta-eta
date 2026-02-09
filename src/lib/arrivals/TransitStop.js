@@ -52,11 +52,23 @@ function normalizeEtas(arrivals, walkMinutes) {
 }
 
 export class TransitStop {
-  constructor({ stopId, name, type, distanceMiles, arrivals = [] }) {
+  constructor({
+    stopId,
+    name,
+    type,
+    distanceMiles,
+    latitude = null,
+    longitude = null,
+    lineColors = [],
+    arrivals = [],
+  }) {
     this.stopId = stopId;
     this.name = name;
     this.type = type;
     this.distanceMiles = distanceMiles;
+    this.latitude = latitude;
+    this.longitude = longitude;
+    this._lineColors = Array.isArray(lineColors) ? lineColors : [];
     this.arrivals = arrivals.map((arrival) => {
       if (!(arrival instanceof TransitArrival)) {
         throw new TypeError(
@@ -69,11 +81,18 @@ export class TransitStop {
   }
 
   static fromStopData(stop) {
+    const stopLineColors =
+      typeof stop.lineColors === "function"
+        ? stop.lineColors()
+        : (stop.lines ?? []);
     const stopData = {
       stopId: stop.stopId,
       name: stop.displayName,
       type: stop.type,
       distanceMiles: stop.distanceMiles,
+      latitude: stop.latitude,
+      longitude: stop.longitude,
+      lineColors: stopLineColors,
       arrivals: stop.predictions ?? [],
     };
 
@@ -109,6 +128,10 @@ export class TransitStop {
     return { routes: [], directions: [] };
   }
 
+  lineColors() {
+    return [];
+  }
+
   GroupArrivals(options = {}) {
     return this.groupArrivals(options);
   }
@@ -119,6 +142,12 @@ export class TransitStop {
 
   get stopCategory() {
     return this.type === "train" ? "Station" : "Bus Stop";
+  }
+
+  get anchorId() {
+    const raw = String(this.stopId ?? "").trim() || "unknown-stop";
+    const normalized = raw.replace(/[^a-zA-Z0-9_-]+/g, "-");
+    return `arrival-stop-${normalized}`;
   }
 
   toUpcomingStop({ walkSpeedMph = 2 } = {}) {
@@ -203,6 +232,10 @@ export class BusStop extends TransitStop {
   get stopCategory() {
     return "Bus Stop";
   }
+
+  lineColors() {
+    return [];
+  }
 }
 
 export class TrainStop extends TransitStop {
@@ -268,5 +301,9 @@ export class TrainStop extends TransitStop {
 
   get stopCategory() {
     return "Station";
+  }
+
+  lineColors() {
+    return [...this._lineColors];
   }
 }

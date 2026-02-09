@@ -1,7 +1,7 @@
 import { escapeHtml, formatClock, formatMinutes } from "$lib/cta";
+import { TransitArrival } from "$lib/arrivals/TransitArrival";
+import { TransitStop as TransitStopModel } from "$lib/arrivals/TransitStop";
 import {
-  busDirectionOnly,
-  destinationOrDirection,
   distanceWithWalkText,
   etaTimingClass,
   walkingMinutesFromMiles,
@@ -12,11 +12,15 @@ function predictionSortTime(arrival) {
 }
 
 export function markerBackground(stop) {
+  if (!(stop instanceof TransitStopModel)) {
+    throw new TypeError("markerBackground expects a TransitStop instance");
+  }
+
   if (stop.type === "bus") {
     return "#151515";
   }
 
-  const colors = (stop.lines ?? []).map((line) => line.color);
+  const colors = (stop.lineColors?.() ?? []).map((line) => line.color);
 
   if (colors.length === 0) {
     return "#4c566a";
@@ -37,13 +41,20 @@ export function markerBackground(stop) {
 }
 
 export function busMarkerLines(stop) {
+  if (!(stop instanceof TransitStopModel)) {
+    throw new TypeError("busMarkerLines expects a TransitStop instance");
+  }
+
   const routes = [
     ...new Set(
-      (stop.predictions ?? []).map((prediction) => String(prediction.route)),
+      (stop.arrivals ?? []).map((prediction) => String(prediction.route)),
     ),
   ]
     .map((route) => route.trim())
-    .filter(Boolean);
+    .filter(Boolean)
+    .sort((a, b) =>
+      a.localeCompare(b, undefined, { numeric: true, sensitivity: "base" }),
+    );
 
   if (!routes.length) {
     return ["Bus"];
@@ -58,6 +69,10 @@ export function busMarkerLines(stop) {
 }
 
 export function markerIcon(leaflet, stop) {
+  if (!(stop instanceof TransitStopModel)) {
+    throw new TypeError("markerIcon expects a TransitStop instance");
+  }
+
   if (stop.type === "bus") {
     const lines = busMarkerLines(stop);
     const lineHtml = lines
@@ -84,10 +99,64 @@ export function markerIcon(leaflet, stop) {
 }
 
 export function popupHtml(stop, { walkSpeedMph = 2 } = {}) {
+  if (!(stop instanceof TransitStopModel)) {
+    throw new TypeError("popupHtml expects a TransitStop instance");
+  }
+
   const walkMinutes = walkingMinutesFromMiles(stop.distanceMiles, walkSpeedMph);
-  const predictions = [...(stop.predictions ?? [])]
-    .sort((a, b) => predictionSortTime(a) - predictionSortTime(b))
-    .slice(0, 8);
+  const closestByRouteDirection = new Map();
+  for (const arrival of stop.arrivals ?? []) {
+    if (!(arrival instanceof TransitArrival)) {
+      continue;
+    }
+
+    const route = String(arrival.route ?? "").trim();
+    const direction = String(arrival.direction ?? "").trim();
+    const key = `${route}|${direction}`;
+    const etaMinutes =
+      typeof arrival.getEtaMinutes === "function"
+        ? arrival.getEtaMinutes()
+        : Number.POSITIVE_INFINITY;
+    const existing = closestByRouteDirection.get(key);
+    const existingEta =
+      existing && typeof existing.getEtaMinutes === "function"
+        ? existing.getEtaMinutes()
+        : Number.POSITIVE_INFINITY;
+    if (!existing || etaMinutes < existingEta) {
+      closestByRouteDirection.set(key, arrival);
+    }
+  }
+
+  const predictions = [...closestByRouteDirection.values()].sort((a, b) => {
+    const routeCompare = String(a.route ?? "").localeCompare(
+      String(b.route ?? ""),
+      undefined,
+      { numeric: true, sensitivity: "base" },
+    );
+    if (routeCompare !== 0) {
+      return routeCompare;
+    }
+
+    const directionCompare = String(a.direction ?? "")
+      .trim()
+      .localeCompare(String(b.direction ?? "").trim(), undefined, {
+        numeric: true,
+        sensitivity: "base",
+      });
+    if (directionCompare !== 0) {
+      return directionCompare;
+    }
+
+    const aEta =
+      typeof a.getEtaMinutes === "function"
+        ? a.getEtaMinutes()
+        : Number.POSITIVE_INFINITY;
+    const bEta =
+      typeof b.getEtaMinutes === "function"
+        ? b.getEtaMinutes()
+        : Number.POSITIVE_INFINITY;
+    return aEta - bEta;
+  });
 
   const predictionMarkup = predictions.length
     ? predictions
@@ -99,11 +168,7 @@ export function popupHtml(stop, { walkSpeedMph = 2 } = {}) {
           return `
             <li>
               <strong>${escapeHtml(arrival.route)}</strong>
-              ${escapeHtml(
-                arrival.type === "bus"
-                  ? busDirectionOnly(arrival)
-                  : destinationOrDirection(arrival),
-              )}
+              ${escapeHtml(String(arrival.direction ?? "").trim())}
               <span class="${etaTimingClass(etaMinutes, walkMinutes)}">${escapeHtml(
                 formatMinutes(etaMinutes),
               )} (${escapeHtml(formatClock(arrival.arrivalTime))})</span>
@@ -115,9 +180,10 @@ export function popupHtml(stop, { walkSpeedMph = 2 } = {}) {
 
   return `
     <div class="popup">
-      <h3>${escapeHtml(stop.displayName)}</h3>
+      <h3>${escapeHtml(stop.name)}</h3>
       <p>${escapeHtml(stop.type === "bus" ? "Bus stop" : "Train station")} • ${escapeHtml(distanceWithWalkText(stop.distanceMiles, walkSpeedMph))}</p>
       <ul>${predictionMarkup}</ul>
+      <p class="popup-more"><a href="#${escapeHtml(stop.anchorId)}">See more...</a></p>
     </div>
   `;
 }

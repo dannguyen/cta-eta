@@ -1,31 +1,5 @@
 import { formatClock } from "$lib/cta";
 
-export function busDirectionOnly(prediction) {
-  return String(prediction.direction ?? "").trim() || "N/A";
-}
-
-export function destinationOrDirection(prediction) {
-  const direction = String(prediction.direction ?? "").trim();
-  const destination = String(prediction.destination ?? "").trim();
-
-  if (direction && destination) {
-    const normalizedDirection = direction.toLowerCase();
-    const normalizedDestination = destination.toLowerCase();
-
-    if (
-      normalizedDirection.includes(normalizedDestination) ||
-      normalizedDirection.includes("toward") ||
-      normalizedDirection.includes("to ")
-    ) {
-      return direction;
-    }
-
-    return `${direction} to ${destination}`;
-  }
-
-  return direction || destination || "N/A";
-}
-
 export function etaValueText(minutes) {
   if (minutes === null || minutes === undefined) {
     return "unknown time";

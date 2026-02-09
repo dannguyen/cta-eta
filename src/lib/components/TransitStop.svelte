@@ -40,7 +40,7 @@
   $: arrivalGroups = buildArrivalGroups(transitStop, walkSpeedMph);
 </script>
 
-<li class="arrival-item">
+<li class="arrival-item" id={safeStop.anchorId}>
   <div class="stop-header">
     <span class="stop-name">
       <span class="arrival-emoji">{safeStop.icon}</span>
