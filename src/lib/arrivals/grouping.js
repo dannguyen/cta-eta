@@ -1,12 +1,14 @@
 import { TransitStop } from "$lib/arrivals/TransitStop";
 
 function predictionSortTime(prediction) {
-  return prediction.arrival?.getTime?.() ?? Number.MAX_SAFE_INTEGER;
+  const arrivalTime = prediction?.arrivalTime ?? prediction?.arrival;
+  return arrivalTime?.getTime?.() ?? Number.MAX_SAFE_INTEGER;
 }
 
 function predictionArrivalTime(prediction) {
-  if (prediction?.arrival instanceof Date && !Number.isNaN(prediction.arrival.getTime())) {
-    return prediction.arrival.getTime();
+  const arrivalTime = prediction?.arrivalTime ?? prediction?.arrival;
+  if (arrivalTime instanceof Date && !Number.isNaN(arrivalTime.getTime())) {
+    return arrivalTime.getTime();
   }
 
   return Number.MAX_SAFE_INTEGER;
@@ -202,7 +204,7 @@ export function buildBusStopsFromArrivals(candidateBusStops, arrivals) {
       const predictions = [...group.routeDirections.values()]
         .flatMap((directionArrivals) =>
           [...directionArrivals]
-            .sort((a, b) => predictionArrivalTime(a.toPrediction()) - predictionArrivalTime(b.toPrediction()))
+            .sort((a, b) => predictionArrivalTime(a) - predictionArrivalTime(b))
             .slice(0, 2)
             .map((arrival) => arrival.toPrediction()),
         )

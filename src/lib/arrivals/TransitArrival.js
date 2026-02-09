@@ -172,6 +172,10 @@ export class TransitArrival {
     });
   }
 
+  getEtaMinutes() {
+    return Number.isFinite(this.etaMinutes) ? this.etaMinutes : minutesUntil(this.arrivalTime);
+  }
+
   toPrediction() {
     return {
       type: this.type,
@@ -192,7 +196,7 @@ export class TransitArrival {
       mode: this.type,
       destination: this.destination,
       arrival: this.arrivalTime,
-      minutes: Number.isFinite(this.etaMinutes) ? this.etaMinutes : minutesUntil(this.arrivalTime)
+      minutes: this.getEtaMinutes()
     };
   }
 }

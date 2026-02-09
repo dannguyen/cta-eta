@@ -2,11 +2,12 @@ import { chunk } from "$lib/cta";
 import { TransitArrival } from "$lib/arrivals/TransitArrival";
 
 function predictionTimestamp(prediction) {
+  const arrivalTime = prediction?.arrivalTime ?? prediction?.arrival;
   if (
-    prediction.arrival instanceof Date &&
-    !Number.isNaN(prediction.arrival.getTime())
+    arrivalTime instanceof Date &&
+    !Number.isNaN(arrivalTime.getTime())
   ) {
-    return prediction.arrival.getTime();
+    return arrivalTime.getTime();
   }
 
   if (Number.isFinite(prediction.minutes)) {

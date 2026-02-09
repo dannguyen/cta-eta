@@ -34,13 +34,16 @@ function normalizeEtas(arrivals, walkMinutes) {
   return [...arrivals]
     .sort((a, b) => predictionSortTime(a) - predictionSortTime(b))
     .slice(0, 2)
-    .map((arrival) => ({
-      minutes: arrival.etaMinutes,
-      descriptor: (arrival.etaMinutes ?? Number.MAX_SAFE_INTEGER) <= 0 ? 'now' : 'later',
-      clockText: compactClock(arrival.arrivalTime),
-      timingClass: etaTimingClass(arrival.etaMinutes, walkMinutes),
-      sortTime: predictionSortTime(arrival)
-    }));
+    .map((arrival) => {
+      const etaMinutes = arrival.getEtaMinutes();
+      return {
+        minutes: etaMinutes,
+        descriptor: (etaMinutes ?? Number.MAX_SAFE_INTEGER) <= 0 ? 'now' : 'later',
+        clockText: compactClock(arrival.arrivalTime),
+        timingClass: etaTimingClass(etaMinutes, walkMinutes),
+        sortTime: predictionSortTime(arrival)
+      };
+    });
 }
 
 export class TransitStop {

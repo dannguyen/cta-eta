@@ -37,6 +37,7 @@ describe('TransitArrival.fromBusPrediction', () => {
     expect(arrival.latitude).toBeNull();
     expect(arrival.longitude).toBeNull();
     expect(arrival.heading).toBeNull();
+    expect(arrival.getEtaMinutes()).toBe(5);
 
     const prediction = arrival.toPrediction();
     expect(prediction.mode).toBe('bus');
@@ -85,6 +86,7 @@ describe('TransitArrival.fromTrainEta', () => {
     expect(arrival.latitude).toBeCloseTo(41.888, 6);
     expect(arrival.longitude).toBeCloseTo(-87.633, 6);
     expect(arrival.heading).toBe(270);
+    expect(arrival.getEtaMinutes()).toBeGreaterThanOrEqual(0);
 
     const prediction = arrival.toPrediction();
     expect(prediction.mode).toBe('train');
