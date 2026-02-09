@@ -3,6 +3,8 @@ import {
   buildBusStopsFromArrivals,
   buildTrainStopsFromArrivals,
   buildUpcomingStops,
+  getDistinctBusRoutes,
+  getDistinctTrainRoutes,
   groupBusStopsByName,
 } from "$lib/arrivals/grouping";
 import { BusArrival, TrainArrival } from "$lib/arrivals/TransitArrival";
@@ -60,6 +62,113 @@ function makeTrainArrival({
     etaMinutes: minutes,
   });
 }
+
+describe("getDistinctTrainRoutes", () => {
+  it("reduces train arrivals to distinct route/destination with stop metadata", () => {
+    const arrivals = [
+      makeTrainArrival({
+        stationId: 30170,
+        stopId: 30170,
+        route: "Red",
+        direction: "Howard",
+        destination: "Howard",
+        minutes: 3,
+      }),
+      makeTrainArrival({
+        stationId: 30170,
+        stopId: 30170,
+        route: "Red",
+        direction: "Howard",
+        destination: "Howard",
+        minutes: 8,
+      }),
+      makeTrainArrival({
+        stationId: 30170,
+        stopId: 30170,
+        route: "Red",
+        direction: "95th/Dan Ryan",
+        destination: "95th/Dan Ryan",
+        stopName: "Granville",
+        minutes: 6,
+      }),
+    ];
+
+    const grouped = getDistinctTrainRoutes(arrivals);
+    const keys = Object.keys(grouped);
+    expect(keys).toEqual(
+      expect.arrayContaining([
+        JSON.stringify({ route: "Red", destination: "Howard" }),
+        JSON.stringify({ route: "Red", destination: "95th/Dan Ryan" }),
+      ]),
+    );
+
+    const redHoward =
+      grouped[JSON.stringify({ route: "Red", destination: "Howard" })][0];
+    expect(redHoward).toMatchObject({
+      stopName: "Station",
+      stopId: "30170",
+    });
+    expect(Number.isFinite(redHoward.arrivalTimestamp)).toBe(true);
+
+    const redSouthbound =
+      grouped[
+        JSON.stringify({ route: "Red", destination: "95th/Dan Ryan" })
+      ][0];
+    expect(redSouthbound).toMatchObject({
+      stopName: "Granville",
+      stopId: "30170",
+    });
+    expect(Number.isFinite(redSouthbound.arrivalTimestamp)).toBe(true);
+  });
+});
+
+describe("getDistinctBusRoutes", () => {
+  it("reduces bus arrivals to distinct route/direction/stop entries", () => {
+    const arrivals = [
+      makeBusArrival({
+        stopId: 1001,
+        route: "147",
+        direction: "Northbound",
+        stopName: "Sheridan & Winthrop",
+        minutes: 4,
+      }),
+      makeBusArrival({
+        stopId: 1001,
+        route: "147",
+        direction: "Northbound",
+        stopName: "Sheridan & Winthrop",
+        minutes: 8,
+      }),
+      makeBusArrival({
+        stopId: 1002,
+        route: "147",
+        direction: "Southbound",
+        stopName: "Sheridan & Winthrop",
+        minutes: 6,
+      }),
+    ];
+
+    const reduced = getDistinctBusRoutes(arrivals);
+    const northbound =
+      reduced[JSON.stringify({ route: "147", direction: "Northbound" })];
+    const southbound =
+      reduced[JSON.stringify({ route: "147", direction: "Southbound" })];
+
+    expect(northbound).toHaveLength(1);
+    expect(northbound[0]).toMatchObject({
+      stopName: "Sheridan & Winthrop",
+      stopId: "1001",
+    });
+    expect(Number.isFinite(northbound[0].arrivalTimestamp)).toBe(true);
+
+    expect(southbound).toHaveLength(1);
+    expect(southbound[0]).toMatchObject({
+      stopName: "Sheridan & Winthrop",
+      stopId: "1002",
+    });
+    expect(Number.isFinite(southbound[0].arrivalTimestamp)).toBe(true);
+  });
+});
 
 describe("groupBusStopsByName", () => {
   it("merges opposite-direction stop ids into one named stop group", () => {
@@ -156,10 +265,138 @@ describe("build stops from TransitArrival instances", () => {
       }),
     ];
 
-    const stops = buildTrainStopsFromArrivals(trainStations, arrivals);
+    const trainRoutesAndDestinations = getDistinctTrainRoutes(arrivals);
+    const stops = buildTrainStopsFromArrivals(
+      trainStations,
+      arrivals,
+      trainRoutesAndDestinations,
+    );
     expect(stops).toHaveLength(1);
     expect(stops[0].stopId).toBe("30170");
     expect(stops[0].predictions).toHaveLength(2);
+  });
+
+  it("filters train stops to the reduced route/destination stop ids", () => {
+    const trainStations = [
+      {
+        stopId: "30170",
+        stationId: "30170",
+        displayName: "Thorndale",
+        latitude: 41.99,
+        longitude: -87.66,
+        distanceMiles: 0.2,
+        lines: [{ code: "RED", id: "Red", color: "#d7263d" }],
+      },
+      {
+        stopId: "30200",
+        stationId: "30200",
+        displayName: "Morse",
+        latitude: 42.0,
+        longitude: -87.67,
+        distanceMiles: 0.25,
+        lines: [{ code: "RED", id: "Red", color: "#d7263d" }],
+      },
+    ];
+
+    const arrivals = [
+      makeTrainArrival({
+        stationId: 30170,
+        stopId: 30170,
+        route: "Red",
+        direction: "Howard",
+        destination: "Howard",
+        stopName: "Thorndale",
+        minutes: 4,
+      }),
+      makeTrainArrival({
+        stationId: 30200,
+        stopId: 30200,
+        route: "Red",
+        direction: "95th/Dan Ryan",
+        destination: "95th/Dan Ryan",
+        stopName: "Morse",
+        minutes: 6,
+      }),
+    ];
+
+    const reduced = {
+      [JSON.stringify({ route: "Red", destination: "Howard" })]: [
+        {
+          stopName: "Thorndale",
+          stopId: "30170",
+          arrivalTimestamp: makeArrival(4).getTime(),
+        },
+      ],
+    };
+
+    const stops = buildTrainStopsFromArrivals(trainStations, arrivals, reduced);
+    expect(stops).toHaveLength(1);
+    expect(stops[0].displayName).toBe("Thorndale");
+    expect(stops[0].predictions).toHaveLength(1);
+    expect(stops[0].predictions[0].destination).toBe("Howard");
+  });
+
+  it("limits train arrivals per route/destination using maxClosestArrivals", () => {
+    const trainStations = [
+      {
+        stopId: "30170",
+        stationId: "30170",
+        displayName: "Thorndale",
+        latitude: 41.99,
+        longitude: -87.66,
+        distanceMiles: 0.2,
+        lines: [{ code: "RED", id: "Red", color: "#d7263d" }],
+      },
+    ];
+
+    const arrivals = [
+      makeTrainArrival({
+        stationId: 30170,
+        stopId: 30170,
+        route: "Red",
+        direction: "Howard",
+        destination: "Howard",
+        stopName: "Thorndale",
+        minutes: 2,
+      }),
+      makeTrainArrival({
+        stationId: 30170,
+        stopId: 30170,
+        route: "Red",
+        direction: "Howard",
+        destination: "Howard",
+        stopName: "Thorndale",
+        minutes: 4,
+      }),
+      makeTrainArrival({
+        stationId: 30170,
+        stopId: 30170,
+        route: "Red",
+        direction: "Howard",
+        destination: "Howard",
+        stopName: "Thorndale",
+        minutes: 7,
+      }),
+    ];
+
+    const trainRoutesAndDestinations = getDistinctTrainRoutes(arrivals);
+    const defaultLimited = buildTrainStopsFromArrivals(
+      trainStations,
+      arrivals,
+      trainRoutesAndDestinations,
+    );
+    const onePerRoute = buildTrainStopsFromArrivals(
+      trainStations,
+      arrivals,
+      trainRoutesAndDestinations,
+      1,
+    );
+
+    expect(defaultLimited).toHaveLength(1);
+    expect(defaultLimited[0].predictions).toHaveLength(2);
+    expect(onePerRoute).toHaveLength(1);
+    expect(onePerRoute[0].predictions).toHaveLength(1);
+    expect(onePerRoute[0].predictions[0].getEtaMinutes()).toBe(2);
   });
 
   it("groups bus arrivals by stopName and places stop at midpoint", () => {
@@ -203,11 +440,127 @@ describe("build stops from TransitArrival instances", () => {
       }),
     ];
 
-    const stops = buildBusStopsFromArrivals(candidateBusStops, arrivals);
+    const reducedBusRoutes = getDistinctBusRoutes(arrivals);
+    const stops = buildBusStopsFromArrivals(
+      candidateBusStops,
+      arrivals,
+      reducedBusRoutes,
+    );
     expect(stops).toHaveLength(1);
     expect(stops[0].displayName).toBe("Sheridan & Winthrop");
     expect(stops[0].latitude).toBeCloseTo((41.98 + 41.9804) / 2, 6);
     expect(stops[0].longitude).toBeCloseTo((-87.66 + -87.6596) / 2, 6);
+  });
+
+  it("filters bus stops to reduced route/direction/stop ids", () => {
+    const candidateBusStops = [
+      {
+        stopId: "1001",
+        displayName: "Sheridan & Winthrop",
+        latitude: 41.98,
+        longitude: -87.66,
+        distanceMiles: 0.2,
+      },
+      {
+        stopId: "1002",
+        displayName: "Broadway & Granville",
+        latitude: 41.994,
+        longitude: -87.66,
+        distanceMiles: 0.3,
+      },
+    ];
+
+    const arrivals = [
+      makeBusArrival({
+        stopId: 1001,
+        route: "147",
+        direction: "Northbound",
+        stopName: "Sheridan & Winthrop",
+        minutes: 4,
+      }),
+      makeBusArrival({
+        stopId: 1002,
+        route: "147",
+        direction: "Northbound",
+        stopName: "Broadway & Granville",
+        minutes: 6,
+      }),
+    ];
+
+    const reducedBusRoutes = {
+      [JSON.stringify({ route: "147", direction: "Northbound" })]: [
+        {
+          stopName: "Sheridan & Winthrop",
+          stopId: "1001",
+          arrivalTimestamp: makeArrival(4).getTime(),
+        },
+      ],
+    };
+
+    const stops = buildBusStopsFromArrivals(
+      candidateBusStops,
+      arrivals,
+      reducedBusRoutes,
+    );
+
+    expect(stops).toHaveLength(1);
+    expect(stops[0].displayName).toBe("Sheridan & Winthrop");
+    expect(stops[0].predictions).toHaveLength(1);
+  });
+
+  it("limits bus arrivals per route/direction using maxClosestArrivals", () => {
+    const candidateBusStops = [
+      {
+        stopId: "1001",
+        displayName: "Sheridan & Winthrop",
+        latitude: 41.98,
+        longitude: -87.66,
+        distanceMiles: 0.2,
+      },
+    ];
+
+    const arrivals = [
+      makeBusArrival({
+        stopId: 1001,
+        route: "147",
+        direction: "Northbound",
+        stopName: "Sheridan & Winthrop",
+        minutes: 2,
+      }),
+      makeBusArrival({
+        stopId: 1001,
+        route: "147",
+        direction: "Northbound",
+        stopName: "Sheridan & Winthrop",
+        minutes: 4,
+      }),
+      makeBusArrival({
+        stopId: 1001,
+        route: "147",
+        direction: "Northbound",
+        stopName: "Sheridan & Winthrop",
+        minutes: 6,
+      }),
+    ];
+
+    const reducedBusRoutes = getDistinctBusRoutes(arrivals);
+    const defaultLimited = buildBusStopsFromArrivals(
+      candidateBusStops,
+      arrivals,
+      reducedBusRoutes,
+    );
+    const onePerRoute = buildBusStopsFromArrivals(
+      candidateBusStops,
+      arrivals,
+      reducedBusRoutes,
+      1,
+    );
+
+    expect(defaultLimited).toHaveLength(1);
+    expect(defaultLimited[0].predictions).toHaveLength(2);
+    expect(onePerRoute).toHaveLength(1);
+    expect(onePerRoute[0].predictions).toHaveLength(1);
+    expect(onePerRoute[0].predictions[0].getEtaMinutes()).toBe(2);
   });
 });
 

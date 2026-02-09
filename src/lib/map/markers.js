@@ -91,13 +91,12 @@ export function popupHtml(stop, { walkSpeedMph = 2 } = {}) {
 
   const predictionMarkup = predictions.length
     ? predictions
-      .map(
-          (arrival) => {
-            const etaMinutes =
-              typeof arrival.getEtaMinutes === "function"
-                ? arrival.getEtaMinutes()
-                : null;
-            return `
+        .map((arrival) => {
+          const etaMinutes =
+            typeof arrival.getEtaMinutes === "function"
+              ? arrival.getEtaMinutes()
+              : null;
+          return `
             <li>
               <strong>${escapeHtml(arrival.route)}</strong>
               ${escapeHtml(
@@ -110,8 +109,7 @@ export function popupHtml(stop, { walkSpeedMph = 2 } = {}) {
               )} (${escapeHtml(formatClock(arrival.arrivalTime))})</span>
             </li>
           `;
-          },
-        )
+        })
         .join("")
     : "<li>No live predictions at this time.</li>";
 

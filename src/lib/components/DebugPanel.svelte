@@ -2,12 +2,14 @@
   export let userLocation = null;
   export let foundBusStops = [];
   export let foundTrainStations = [];
-  export let filteredBusApiStops = [];
-  export let filteredTrainApiStations = [];
+  export let filteredBusStops = [];
+  export let filteredTrainStations = [];
   export let searchRadiusMiles = 1;
   export let apiResponses = [];
   export let trainApiUrl = '/api/train';
   export let busApiUrl = '/api/bus';
+  export let trainRoutesAndDestinations = [];
+  export let busRoutesAndDirections = [];
   export let wrangledArrivals = [];
   export let transitStops = [];
 
@@ -57,6 +59,8 @@
   $: busApiResponses = apiResponses.filter((entry) => entry.mode === 'bus');
   $: trainStops = transitStops.filter((stop) => stop?.type === 'train');
   $: busStops = transitStops.filter((stop) => stop?.type === 'bus');
+  $: trainRouteKeys = Object.keys(trainRoutesAndDestinations ?? {});
+  $: busRouteKeys = Object.keys(busRoutesAndDirections ?? {});
 </script>
 
 <section class="debug">
@@ -94,20 +98,20 @@
       we call the APIs with as <code>Stops for API</code>.
     </p>
     <details class="debug-subsection">
-      <summary>Bus Stops for API ({filteredBusApiStops.length})</summary>
-      {#if filteredBusApiStops.length === 0}
+      <summary>Bus Stops for API ({filteredBusStops.length})</summary>
+      {#if filteredBusStops.length === 0}
         <p class="debug-empty">No bus stops selected for API fetches.</p>
       {:else}
-        <pre>{JSON.stringify(filteredBusApiStops, null, 2)}</pre>
+        <pre>{JSON.stringify(filteredBusStops, null, 2)}</pre>
       {/if}
     </details>
 
     <details class="debug-subsection">
-      <summary>Train Stations for API ({filteredTrainApiStations.length})</summary>
-      {#if filteredTrainApiStations.length === 0}
+      <summary>Train Stations for API ({filteredTrainStations.length})</summary>
+      {#if filteredTrainStations.length === 0}
         <p class="debug-empty">No train stations selected for API fetches.</p>
       {:else}
-        <pre>{JSON.stringify(filteredTrainApiStations, null, 2)}</pre>
+        <pre>{JSON.stringify(filteredTrainStations, null, 2)}</pre>
       {/if}
     </details>
   </details>
@@ -173,6 +177,29 @@
         {/if}
       </details>
     {/if}
+  </details>
+
+  <details open>
+    <summary>Train Routes ({trainRouteKeys.length})</summary>
+    <p class="debug-narrative">
+      We filter the API response for distinct combinations of routes (e.g. Red) and directions( e.g. Howard). For each route, we find and keep the stations that have the most recent ETAs.
+    </p>
+    <details class="debug-subsection">
+      <summary>getDistinctTrainRoutes ({trainRouteKeys.length})</summary>
+      <pre>{JSON.stringify(trainRoutesAndDestinations, null, 2)}</pre>
+    </details>
+  </details>
+
+  <details open>
+    <summary>Bus Routes ({busRouteKeys.length})</summary>
+    <p class="debug-narrative">
+      We reduce bus arrivals into distinct route, direction, and stop ID combinations that are used
+      to build BusStop objects.
+    </p>
+    <details class="debug-subsection">
+      <summary>getDistinctBusRoutes ({busRouteKeys.length})</summary>
+      <pre>{JSON.stringify(busRoutesAndDirections, null, 2)}</pre>
+    </details>
   </details>
 
   <details>

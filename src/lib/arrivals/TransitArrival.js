@@ -1,17 +1,22 @@
-import { minutesUntil, parseBusApiDate, parseTrainApiDate, trainDisplayFromRoute } from '$lib/cta';
+import {
+  minutesUntil,
+  parseBusApiDate,
+  parseTrainApiDate,
+  trainDisplayFromRoute,
+} from "$lib/cta";
 
 function parseStopId(value) {
-  const parsed = Number.parseInt(String(value ?? '').trim(), 10);
+  const parsed = Number.parseInt(String(value ?? "").trim(), 10);
   return Number.isFinite(parsed) ? parsed : null;
 }
 
 function parseStationId(value) {
-  const parsed = Number.parseInt(String(value ?? '').trim(), 10);
+  const parsed = Number.parseInt(String(value ?? "").trim(), 10);
   return Number.isFinite(parsed) ? parsed : null;
 }
 
 function parseOptionalNumber(value) {
-  if (value === null || value === undefined || value === '') {
+  if (value === null || value === undefined || value === "") {
     return null;
   }
 
@@ -24,20 +29,22 @@ function parseDelayFlag(value) {
     return value;
   }
 
-  const normalized = String(value ?? '').trim().toLowerCase();
-  if (normalized === '1' || normalized === 'true') {
+  const normalized = String(value ?? "")
+    .trim()
+    .toLowerCase();
+  if (normalized === "1" || normalized === "true") {
     return true;
   }
 
-  if (normalized === '0' || normalized === 'false') {
+  if (normalized === "0" || normalized === "false") {
     return false;
   }
 
   return false;
 }
 
-function normalizedString(value, fallback = '') {
-  const normalized = String(value ?? '').trim();
+function normalizedString(value, fallback = "") {
+  const normalized = String(value ?? "").trim();
   return normalized || fallback;
 }
 
@@ -58,8 +65,8 @@ export class TransitArrival {
     latitude = null,
     longitude = null,
     heading = null,
-    destination = '',
-    etaMinutes = null
+    destination = "",
+    etaMinutes = null,
   }) {
     this.type = type;
     this.stationId = stationId;
@@ -80,20 +87,23 @@ export class TransitArrival {
     this.etaMinutes = Number.isFinite(etaMinutes) ? etaMinutes : null;
   }
 
-  static fromBusPrediction(prediction, { stopLatitude = null, stopLongitude = null } = {}) {
+  static fromBusPrediction(
+    prediction,
+    { stopLatitude = null, stopLongitude = null } = {},
+  ) {
     const arrivalTime = parseBusApiDate(prediction.prdtm);
     const countdown = Number(prediction.prdctdn);
     const fallbackMinutes = minutesUntil(arrivalTime);
     const etaMinutes = Number.isFinite(countdown)
       ? Math.max(0, countdown)
-      : prediction.prdctdn === 'DUE'
+      : prediction.prdctdn === "DUE"
         ? 0
         : fallbackMinutes;
 
     return new BusArrival({
       stopId: parseStopId(prediction.stpid),
-      route: normalizedString(prediction.rt, 'Bus'),
-      direction: normalizedString(prediction.rtdir, 'Inbound'),
+      route: normalizedString(prediction.rt, "Bus"),
+      direction: normalizedString(prediction.rtdir, "Inbound"),
       arrivalTime,
       predictionTime: parseBusApiDate(prediction.tmstmp),
       vId: normalizedString(prediction.vid) || null,
@@ -102,7 +112,7 @@ export class TransitArrival {
       stopLatitude: parseOptionalNumber(stopLatitude),
       stopLongitude: parseOptionalNumber(stopLongitude),
       destination: normalizedString(prediction.des),
-      etaMinutes
+      etaMinutes,
     });
   }
 
@@ -111,19 +121,21 @@ export class TransitArrival {
     {
       fallbackStopId = null,
       fallbackStationId = null,
-      fallbackStopName = '',
+      fallbackStopName = "",
       stopLatitude = null,
-      stopLongitude = null
-    } = {}
+      stopLongitude = null,
+    } = {},
   ) {
     const displayRoute = trainDisplayFromRoute(eta.rt);
-    const destination = normalizedString(eta.destNm, 'Unknown destination');
-    const stationId = parseStationId(eta.staId ?? fallbackStationId ?? fallbackStopId);
+    const destination = normalizedString(eta.destNm, "Unknown destination");
+    const stationId = parseStationId(
+      eta.staId ?? fallbackStationId ?? fallbackStopId,
+    );
 
     return new TrainArrival({
       stationId,
       stopId: parseStopId(eta.staId ?? fallbackStopId),
-      route: normalizedString(displayRoute.name, 'Train'),
+      route: normalizedString(displayRoute.name, "Train"),
       direction: destination,
       arrivalTime: parseTrainApiDate(eta.arrT),
       predictionTime: parseTrainApiDate(eta.prdt),
@@ -135,12 +147,14 @@ export class TransitArrival {
       latitude: parseOptionalNumber(eta.lat),
       longitude: parseOptionalNumber(eta.lon),
       heading: parseOptionalNumber(eta.heading),
-      destination
+      destination,
     });
   }
 
   getEtaMinutes() {
-    return Number.isFinite(this.etaMinutes) ? this.etaMinutes : minutesUntil(this.arrivalTime);
+    return Number.isFinite(this.etaMinutes)
+      ? this.etaMinutes
+      : minutesUntil(this.arrivalTime);
   }
 }
 
@@ -148,8 +162,8 @@ export class BusArrival extends TransitArrival {
   constructor(payload) {
     super({
       ...payload,
-      type: 'bus',
-      stationId: null
+      type: "bus",
+      stationId: null,
     });
   }
 }
@@ -158,7 +172,7 @@ export class TrainArrival extends TransitArrival {
   constructor(payload) {
     super({
       ...payload,
-      type: 'train'
+      type: "train",
     });
   }
 }

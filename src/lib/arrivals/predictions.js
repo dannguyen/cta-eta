@@ -3,10 +3,7 @@ import { TransitArrival, TrainArrival } from "$lib/arrivals/TransitArrival";
 
 function predictionTimestamp(arrival) {
   const arrivalTime = arrival?.arrivalTime;
-  if (
-    arrivalTime instanceof Date &&
-    !Number.isNaN(arrivalTime.getTime())
-  ) {
+  if (arrivalTime instanceof Date && !Number.isNaN(arrivalTime.getTime())) {
     return arrivalTime.getTime();
   }
 
@@ -140,7 +137,9 @@ export async function fetchTrainPredictions(
 
   for (const group of predictionsByRouteDestination.values()) {
     const stationIds = [
-      ...new Set(group.map((arrival) => String(arrival.stationId ?? arrival.stopId))),
+      ...new Set(
+        group.map((arrival) => String(arrival.stationId ?? arrival.stopId)),
+      ),
     ].filter((stationId) => distanceByStationId.has(stationId));
 
     stationIds.sort(

@@ -7,7 +7,12 @@
   import { getUserLocation } from '$lib/location';
   import { TransitStop as TransitStopModel } from '$lib/arrivals/TransitStop';
   import { fetchBusPredictions, fetchTrainPredictions } from '$lib/arrivals/predictions';
-  import { buildBusStopsFromArrivals, buildTrainStopsFromArrivals, buildUpcomingStops } from '$lib/arrivals/grouping';
+  import {
+    buildBusStopsFromArrivals,
+    buildTrainStopsFromArrivals,
+    getDistinctBusRoutes,
+    getDistinctTrainRoutes
+  } from '$lib/arrivals/grouping';
   import { markerIcon, popupHtml } from '$lib/map/markers';
   import TransitStopItem from '$lib/components/TransitStop.svelte';
   import DebugPanel from '$lib/components/DebugPanel.svelte';
@@ -33,11 +38,14 @@
 
   let loadNonce = 0;
   const IS_DEV = import.meta.env.DEV;
-  let filteredBusApiStops = [];
-  let filteredTrainApiStations = [];
+  let filteredBusStops = [];
+  let filteredTrainStations = [];
   let apiResponses = [];
   let wrangledArrivals = [];
   let transitStops = [];
+  let upcomingTransitStops = [];
+  let trainRoutesAndDestinations = [];
+  let busRoutesAndDirections = [];
 
   async function ensureLeaflet() {
     if (L) {
@@ -108,11 +116,14 @@
     errorMessage = '';
     foundBusStops = [];
     foundTrainStations = [];
-    filteredBusApiStops = [];
-    filteredTrainApiStations = [];
+    filteredBusStops = [];
+    filteredTrainStations = [];
     apiResponses = [];
     wrangledArrivals = [];
     transitStops = [];
+    upcomingTransitStops = [];
+    trainRoutesAndDestinations = [];
+    busRoutesAndDirections = [];
     nearbyStops = [];
 
     try {
@@ -138,12 +149,12 @@
       );
 
       foundBusStops = withinRadius(parseBusStops(busCsv), userLocation, SEARCH_RADIUS_MILES);
-      filteredTrainApiStations = foundTrainStations;
-      filteredBusApiStops = foundBusStops.slice(0, 10);
+      filteredTrainStations = foundTrainStations;
+      filteredBusStops = foundBusStops.slice(0, 10);
 
       loadingMessage = 'Loading train and bus ETAs...';
       const [trainData, busData] = await Promise.all([
-        fetchTrainPredictions(filteredTrainApiStations, {
+        fetchTrainPredictions(filteredTrainStations, {
           endpoint: apiEndpoint('api/train'),
           onApiResponse: (entry) => {
             if (currentNonce !== loadNonce) {
@@ -152,7 +163,7 @@
             apiResponses = [...apiResponses, entry];
           }
         }),
-        fetchBusPredictions(filteredBusApiStops, {
+        fetchBusPredictions(filteredBusStops, {
           endpoint: apiEndpoint('api/bus'),
           onApiResponse: (entry) => {
             if (currentNonce !== loadNonce) {
@@ -166,11 +177,25 @@
         return;
       }
 
-      const enrichedTrainStops = buildTrainStopsFromArrivals(filteredTrainApiStations, trainData.arrivals);
-      const enrichedBusStops = buildBusStopsFromArrivals(filteredBusApiStops, busData.arrivals);
+      trainRoutesAndDestinations = getDistinctTrainRoutes(trainData.arrivals);
+      busRoutesAndDirections = getDistinctBusRoutes(busData.arrivals);
+      const enrichedTrainStops = buildTrainStopsFromArrivals(
+        filteredTrainStations,
+        trainData.arrivals,
+        trainRoutesAndDestinations
+      );
+      const enrichedBusStops = buildBusStopsFromArrivals(
+        filteredBusStops,
+        busData.arrivals,
+        busRoutesAndDirections
+      );
       const wrangledStops = [...enrichedTrainStops, ...enrichedBusStops];
+      const stopModels = wrangledStops.map((stop) => TransitStopModel.fromStopData(stop));
+      upcomingTransitStops = stopModels
+        .filter((stop) => stop.arrivals.length > 0)
+        .sort((a, b) => a.distanceMiles - b.distanceMiles);
+
       if (IS_DEV) {
-        const stopModels = wrangledStops.map((stop) => TransitStopModel.fromStopData(stop));
         transitStops = stopModels;
         wrangledArrivals = stopModels.flatMap((stop) => stop.arrivals);
       }
@@ -227,7 +252,6 @@
       .map((line) => ({ label: line.id, color: line.color }))
   ];
 
-  $: upcomingStops = buildUpcomingStops(nearbyStops, { walkSpeedMph: WALK_SPEED_MPH });
 </script>
 
 <svelte:head>
@@ -284,12 +308,12 @@
 
     {#if !loading && !errorMessage && nearbyStops.length === 0}
       <p class="empty">No CTA stops found in a {SEARCH_RADIUS_MILES}-mile radius.</p>
-    {:else if !loading && !errorMessage && upcomingStops.length === 0}
+    {:else if !loading && !errorMessage && upcomingTransitStops.length === 0}
       <p class="empty">No live arrivals available right now.</p>
-    {:else if upcomingStops.length > 0}
+    {:else if upcomingTransitStops.length > 0}
       <ul class="arrival-list">
-        {#each upcomingStops as stop}
-          <TransitStopItem {stop} />
+        {#each upcomingTransitStops as transitStop}
+          <TransitStopItem {transitStop} walkSpeedMph={WALK_SPEED_MPH} />
         {/each}
       </ul>
     {/if}
@@ -300,12 +324,14 @@
       {userLocation}
       {foundBusStops}
       {foundTrainStations}
-      {filteredBusApiStops}
-      {filteredTrainApiStations}
+      {filteredBusStops}
+      {filteredTrainStations}
       searchRadiusMiles={SEARCH_RADIUS_MILES}
       {apiResponses}
       trainApiUrl={TRAIN_API_URL}
       busApiUrl={BUS_API_URL}
+      {trainRoutesAndDestinations}
+      {busRoutesAndDirections}
       {wrangledArrivals}
       {transitStops}
     />
