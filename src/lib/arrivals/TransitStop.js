@@ -149,39 +149,36 @@ export class BusStop extends TransitStop {
       this.distanceMiles,
       walkSpeedMph,
     );
-    const groupedByDirection = new Map();
+    const groupedByRoute = new Map();
 
     for (const arrival of this.arrivals) {
       const routeName = String(arrival.route);
       const directionLabel = String(arrival.direction || "Inbound");
-      const directionGroup = groupedByDirection.get(directionLabel) ?? {
-        direction: directionLabel,
-        routes: new Map(),
-      };
-      const routeGroup = directionGroup.routes.get(routeName) ?? {
+      const routeGroup = groupedByRoute.get(routeName) ?? {
         route: routeName,
         typeLabel: "Bus",
-        arrivals: [],
+        directions: new Map(),
       };
 
-      routeGroup.arrivals.push(arrival);
-      directionGroup.routes.set(routeName, routeGroup);
-      groupedByDirection.set(directionLabel, directionGroup);
+      const directionGroup = routeGroup.directions.get(directionLabel) ?? [];
+      directionGroup.push(arrival);
+      routeGroup.directions.set(directionLabel, directionGroup);
+      groupedByRoute.set(routeName, routeGroup);
     }
 
-    const directions = [...groupedByDirection.values()]
-      .map((directionGroup) => ({
-        direction: directionGroup.direction,
-        routes: [...directionGroup.routes.values()]
-          .map((routeGroup) => ({
-            route: routeGroup.route,
-            typeLabel: routeGroup.typeLabel,
-            etas: normalizeEtas(routeGroup.arrivals, walkMinutes),
+    const routes = [...groupedByRoute.values()]
+      .map((routeGroup) => ({
+        route: routeGroup.route,
+        typeLabel: routeGroup.typeLabel,
+        destinations: [...routeGroup.directions.entries()]
+          .map(([direction, directionArrivals]) => ({
+            direction,
+            etas: normalizeEtas(directionArrivals, walkMinutes),
           }))
           .sort((a, b) =>
             compareLocaleWithFallback(
-              a.route,
-              b.route,
+              a.direction,
+              b.direction,
               a.etas[0]?.sortTime ?? Number.MAX_SAFE_INTEGER,
               b.etas[0]?.sortTime ?? Number.MAX_SAFE_INTEGER,
             ),
@@ -189,14 +186,14 @@ export class BusStop extends TransitStop {
       }))
       .sort((a, b) =>
         compareLocaleWithFallback(
-          a.direction,
-          b.direction,
-          a.routes[0]?.etas[0]?.sortTime ?? Number.MAX_SAFE_INTEGER,
-          b.routes[0]?.etas[0]?.sortTime ?? Number.MAX_SAFE_INTEGER,
+          a.route,
+          b.route,
+          a.destinations[0]?.etas[0]?.sortTime ?? Number.MAX_SAFE_INTEGER,
+          b.destinations[0]?.etas[0]?.sortTime ?? Number.MAX_SAFE_INTEGER,
         ),
       );
 
-    return { routes: [], directions };
+    return { routes, directions: [] };
   }
 
   get icon() {

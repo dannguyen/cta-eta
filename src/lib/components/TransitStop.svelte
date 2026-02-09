@@ -10,36 +10,22 @@
     }
 
     const grouped = currentStop.groupArrivals({ walkSpeedMph: currentWalkSpeedMph });
+    const mode = currentStop.type === 'train' ? 'train' : 'bus';
 
-    if (currentStop.type === 'train') {
-      return grouped.routes.map((route) => ({
-        key: `train-group:${currentStop.stopId}:${route.route}`,
-        mode: 'train',
-        rows: route.destinations.map((destination, destinationIndex) => ({
-          key: `train:${currentStop.stopId}:${route.route}:${destination.direction}`,
-          showFirstColumn: destinationIndex === 0,
+    return grouped.routes.map((route) => {
+      return {
+        key: `${mode}-group:${currentStop.stopId}:${route.route}`,
+        mode,
+        rows: route.destinations.map((destination) => ({
+          key: `${mode}:${currentStop.stopId}:${route.route}:${destination.direction}`,
           routeName: route.route,
           routeTypeLabel: route.typeLabel,
-          routeColorClass: route.route.toLowerCase(),
+          routeColorClass: mode === 'train' ? route.route.toLowerCase() : '',
           direction: destination.direction,
           etas: destination.etas
         }))
-      }));
-    }
-
-    return grouped.directions.map((direction) => ({
-      key: `bus-group:${currentStop.stopId}:${direction.direction}`,
-      mode: 'bus',
-      rows: direction.routes.map((route, routeIndex) => ({
-        key: `bus:${currentStop.stopId}:${direction.direction}:${route.route}`,
-        showFirstColumn: routeIndex === 0,
-        routeName: route.route,
-        routeTypeLabel: route.typeLabel,
-        routeColorClass: '',
-        direction: direction.direction,
-        etas: route.etas
-      }))
-    }));
+      };
+    });
   }
 
   $: safeStop = transitStop ?? {
@@ -59,7 +45,9 @@
     <span class="stop-name">
       <span class="arrival-emoji">{safeStop.icon}</span>
       <span class="name">{safeStop.name}</span>
+      {#if safeStop.type === 'train'}
       <span class="category">{safeStop.stopCategory}</span>
+      {/if}
     </span>
 
     <span class="walk-eta">{distance.walkText}</span>
@@ -86,10 +74,12 @@
   }
 
   .arrival-emoji {
-    margin-right: 6px;
+    padding-right: 0.2em;
+    background: white;
   }
 
   .stop-header {
+    background: black;
     display: grid;
     grid-template-columns: minmax(96px, max-content) minmax(0, 1fr) max-content max-content;
     align-items: center;
@@ -106,7 +96,10 @@
   .stop-name {
     font-size: 1.1em;
     font-weight: 700;
-    color: #0f172a;
+    color: white;
+    padding-right: 0.2em;
+    padding-top: 0.2em;
+    padding-bottom: 0.2em;
   }
 
   .stop-name {
@@ -117,7 +110,7 @@
     grid-column: 3;
     justify-self: end;
     white-space: nowrap;
-    color: #334155;
+    color: #ccc;
     font-weight: 600;
   }
 
@@ -125,8 +118,9 @@
     grid-column: 4;
     justify-self: end;
     white-space: nowrap;
-    color: #475569;
+    color: #aaa;
     font-weight: 400;
+        padding-right: 0.2em;
   }
 
   @media (min-width: 900px) {

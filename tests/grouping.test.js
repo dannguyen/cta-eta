@@ -614,7 +614,7 @@ describe("buildUpcomingStops", () => {
     expect(destinationLabels).toContain("95th/Dan Ryan");
   });
 
-  it("builds bus view model grouped by direction then route", () => {
+  it("builds bus view model grouped by route then direction", () => {
     const nearbyStops = [
       {
         stopId: "bus:SHERIDAN_WINTHROP",
@@ -653,16 +653,15 @@ describe("buildUpcomingStops", () => {
     const upcoming = buildUpcomingStops(nearbyStops, { walkSpeedMph: 2 });
 
     expect(upcoming).toHaveLength(1);
-    expect(upcoming[0].directions.map((d) => d.direction).sort()).toEqual([
-      "Northbound",
-      "Southbound",
+    expect(upcoming[0].directions).toEqual([]);
+    expect(upcoming[0].routes.map((route) => route.route).sort()).toEqual([
+      "146",
+      "147",
     ]);
 
-    const northbound = upcoming[0].directions.find(
-      (direction) => direction.direction === "Northbound",
-    );
-    expect(northbound.routes).toHaveLength(1);
-    expect(northbound.routes[0].route).toBe("147");
-    expect(northbound.routes[0].etas).toHaveLength(2);
+    const route147 = upcoming[0].routes.find((route) => route.route === "147");
+    expect(route147.destinations).toHaveLength(1);
+    expect(route147.destinations[0].direction).toBe("Northbound");
+    expect(route147.destinations[0].etas).toHaveLength(2);
   });
 });

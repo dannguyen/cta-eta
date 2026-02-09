@@ -39,7 +39,7 @@ describe("TransitStop distanceFromUser", () => {
 });
 
 describe("TransitStop grouping", () => {
-  it("groups bus arrivals by direction then route", () => {
+  it("groups bus arrivals by route then direction", () => {
     const stop = new BusStop({
       stopId: "bus:sample",
       name: "Sheridan & Winthrop",
@@ -53,17 +53,16 @@ describe("TransitStop grouping", () => {
     });
 
     const grouped = stop.groupArrivals({ walkSpeedMph: 2 });
-    expect(grouped.routes).toEqual([]);
-    expect(
-      grouped.directions.map((direction) => direction.direction).sort(),
-    ).toEqual(["Northbound", "Southbound"]);
+    expect(grouped.directions).toEqual([]);
+    expect(grouped.routes.map((route) => route.route).sort()).toEqual([
+      "146",
+      "147",
+    ]);
 
-    const northbound = grouped.directions.find(
-      (direction) => direction.direction === "Northbound",
-    );
-    expect(northbound.routes).toHaveLength(1);
-    expect(northbound.routes[0].route).toBe("147");
-    expect(northbound.routes[0].etas).toHaveLength(2);
+    const route147 = grouped.routes.find((route) => route.route === "147");
+    expect(route147.destinations).toHaveLength(1);
+    expect(route147.destinations[0].direction).toBe("Northbound");
+    expect(route147.destinations[0].etas).toHaveLength(2);
   });
 
   it("groups train arrivals by route then direction", () => {

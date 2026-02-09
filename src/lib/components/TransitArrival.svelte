@@ -2,35 +2,16 @@
   import { etaUnitText, etaValueText } from '$lib/arrivals/formatting';
 
   export let mode = 'bus';
-  export let showFirstColumn = true;
-  export let routeName = '';
-  export let routeTypeLabel = '';
-  export let routeColorClass = '';
   export let direction = '';
   export let etas = [];
+  export let showDivider = false;
 
   $: isTrain = mode === 'train';
 </script>
 
-<li class={`route-item ${mode}`}>
-  <span class="group-label" class:ghost={!showFirstColumn} class:arrival-emphasis={!isTrain}>
-    {#if isTrain}
-      <span class={`route-name train ${routeColorClass}`}>
-        {routeName}
-        <span class="route-type">{routeTypeLabel || 'Line'}</span>
-      </span>
-    {:else}
-      {direction}
-    {/if}
-  </span>
-
-  <span class="route-label" class:arrival-emphasis={isTrain}>
-    {#if isTrain}
-      {direction}
-    {:else}
-      <span class="route-name bus">{routeName}</span>
-      <span class="route-type">{routeTypeLabel || 'Bus'}</span>
-    {/if}
+<li class={`route-item ${mode}`} class:with-divider={showDivider}>
+  <span class="route-label direction">
+    {direction}
   </span>
 
   <span class="eta-stack">
@@ -56,86 +37,39 @@
 
   .route-item {
     display: grid;
-    grid-template-columns: minmax(96px, max-content) minmax(0, 1fr) max-content max-content;
-    align-items: baseline;
+    grid-template-columns: minmax(0, 1fr) max-content max-content;
+    align-items: center;
     column-gap: 8px;
     margin-top: 1px;
     margin-bottom: 0.2rem;
     width: 100%;
   }
 
-  .group-label {
-    display: inline-flex;
-    align-items: baseline;
-    white-space: nowrap;
-  }
-
-  .group-label.ghost {
-    visibility: hidden;
+  .route-item.with-divider {
+    border-top: 1px solid #bbb;
+    margin-top: 3px;
+    padding-top: 3px;
   }
 
   .route-label {
     display: inline-flex;
-    align-items: baseline;
+    align-items: center;
+    align-self: center;
     gap: 6px;
     min-width: 0;
     white-space: nowrap;
   }
 
-  .route-item.bus .route-type {
-    display: none;
-  }
-
-  .route-name {
-    font-weight: 400;
-    padding: 0.1rem 0.2rem;
-    border: thin solid gray;
-  }
-
-  .route-name.bus {
-    align-self: flex-start;
+  .route-label.direction{
     font-weight: 600;
-    border-radius: 5%;
-  }
-
-  .route-name.train {
-    font-weight: 600;
-    color: white;
-  }
-
-  .route-name.blue {
-    background: #0000cc;
-  }
-
-  .route-name.brown {
-    background: brown;
-  }
-
-  .route-name.green {
-    background: #00cc00;
-  }
-
-  .route-name.orange {
-    background: orange;
-  }
-
-  .route-name.purple {
-    background: purple;
-  }
-
-  .route-name.red {
-    background: #cc0000;
-  }
-
-  .route-name.yellow {
-    background: yellow;
   }
 
   .eta-stack {
-    grid-column: 3 / span 2;
+    grid-column: 2 / span 2;
     display: grid;
     grid-auto-rows: min-content;
-    align-items: flex-start;
+    align-items: center;
+    align-self: center;
     row-gap: 2px;
     width: 100%;
   }

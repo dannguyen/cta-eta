@@ -598,5 +598,9 @@
       height: 46vh;
       border-radius: 12px;
     }
+
+    header.site-title h2 {
+      display: none;
+    }
   }
 </style>
