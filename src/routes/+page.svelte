@@ -31,9 +31,9 @@
 
   let loadNonce = 0;
   const IS_DEV = import.meta.env.DEV;
-  let debugFilteredBusApiStops = [];
-  let debugFilteredTrainApiStations = [];
-  let debugApiResponses = [];
+  let filteredBusApiStops = [];
+  let filteredTrainApiStations = [];
+  let apiResponses = [];
   let debugWrangledTransitArrivals = [];
   let debugTransitStops = [];
 
@@ -130,11 +130,11 @@
     errorMessage = '';
     foundBusStops = [];
     foundTrainStations = [];
+    filteredBusApiStops = [];
+    filteredTrainApiStations = [];
+    apiResponses = [];
     nearbyStops = [];
     if (IS_DEV) {
-      debugFilteredBusApiStops = [];
-      debugFilteredTrainApiStations = [];
-      debugApiResponses = [];
       debugWrangledTransitArrivals = [];
       debugTransitStops = [];
     }
@@ -162,31 +162,27 @@
       );
 
       foundBusStops = withinRadius(parseBusStops(busCsv), userLocation, SEARCH_RADIUS_MILES);
-      const candidateTrainStations = foundTrainStations;
-      const candidateBusStops = foundBusStops.slice(0, 10);
-      if (IS_DEV) {
-        debugFilteredTrainApiStations = candidateTrainStations;
-        debugFilteredBusApiStops = candidateBusStops;
-      }
+      filteredTrainApiStations = foundTrainStations;
+      filteredBusApiStops = foundBusStops.slice(0, 10);
 
       loadingMessage = 'Loading train and bus ETAs...';
       const [trainData, busData] = await Promise.all([
-        fetchTrainPredictions(candidateTrainStations, {
+        fetchTrainPredictions(filteredTrainApiStations, {
           endpoint: apiEndpoint('api/train'),
           onApiResponse: (entry) => {
-            if (currentNonce !== loadNonce || !IS_DEV) {
+            if (currentNonce !== loadNonce) {
               return;
             }
-            debugApiResponses = [...debugApiResponses, entry];
+            apiResponses = [...apiResponses, entry];
           }
         }),
-        fetchBusPredictions(candidateBusStops, {
+        fetchBusPredictions(filteredBusApiStops, {
           endpoint: apiEndpoint('api/bus'),
           onApiResponse: (entry) => {
-            if (currentNonce !== loadNonce || !IS_DEV) {
+            if (currentNonce !== loadNonce) {
               return;
             }
-            debugApiResponses = [...debugApiResponses, entry];
+            apiResponses = [...apiResponses, entry];
           }
         })
       ]);
@@ -194,8 +190,8 @@
         return;
       }
 
-      const enrichedTrainStops = buildTrainStopsFromArrivals(foundTrainStations, trainData.arrivals);
-      const enrichedBusStops = buildBusStopsFromArrivals(candidateBusStops, busData.arrivals);
+      const enrichedTrainStops = buildTrainStopsFromArrivals(filteredTrainApiStations, trainData.arrivals);
+      const enrichedBusStops = buildBusStopsFromArrivals(filteredBusApiStops, busData.arrivals);
       const wrangledStops = [...enrichedTrainStops, ...enrichedBusStops];
       if (IS_DEV) {
         const transitStops = wrangledStops.map((stop) => TransitStopModel.fromStopData(stop));
@@ -331,10 +327,10 @@
       {userLocation}
       {foundBusStops}
       {foundTrainStations}
-      filteredBusApiStops={debugFilteredBusApiStops}
-      filteredTrainApiStations={debugFilteredTrainApiStations}
+      {filteredBusApiStops}
+      {filteredTrainApiStations}
       searchRadiusMiles={SEARCH_RADIUS_MILES}
-      apiResponses={debugApiResponses}
+      {apiResponses}
       wrangledTransitArrivals={debugWrangledTransitArrivals}
       transitStops={debugTransitStops}
     />
