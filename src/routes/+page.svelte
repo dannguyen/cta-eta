@@ -5,12 +5,12 @@
   import { TRAIN_LINE_META, parseBusStops, parseTrainStations, withinRadius } from '$lib/cta';
   import { apiEndpoint, fetchText, withBasePath } from '$lib/api';
   import { getUserLocation } from '$lib/location';
-  import { TransitArrival } from '$lib/arrivals/TransitArrival';
   import { TransitStop as TransitStopModel } from '$lib/arrivals/TransitStop';
   import { fetchBusPredictions, fetchTrainPredictions } from '$lib/arrivals/predictions';
   import { buildBusStopsFromArrivals, buildTrainStopsFromArrivals, buildUpcomingStops } from '$lib/arrivals/grouping';
   import { markerIcon, popupHtml } from '$lib/map/markers';
   import TransitStopItem from '$lib/components/TransitStop.svelte';
+  import DebugPanel from '$lib/components/DebugPanel.svelte';
 
   const SEARCH_RADIUS_MILES = 1;
   const WALK_SPEED_MPH = 2;
@@ -20,6 +20,8 @@
   let errorMessage = '';
 
   let userLocation = null;
+  let foundBusStops = [];
+  let foundTrainStations = [];
   let nearbyStops = [];
 
   let mapContainer;
@@ -29,16 +31,11 @@
 
   let loadNonce = 0;
   const IS_DEV = import.meta.env.DEV;
-  let debugUserLocation = null;
-  let debugFilteredBusStops = [];
-  let debugFilteredTrainStations = [];
   let debugFilteredBusApiStops = [];
   let debugFilteredTrainApiStations = [];
   let debugApiResponses = [];
   let debugWrangledTransitArrivals = [];
   let debugTransitStops = [];
-  let debugTrainApiResponses = [];
-  let debugBusApiResponses = [];
 
   function debugArrivalSnapshot(arrivals) {
     return arrivals.map((arrival) => arrival.toPrediction());
@@ -62,63 +59,6 @@
         groupedArrivals: grouped
       };
     });
-  }
-
-  function debugStopIdentityList(stops, type) {
-    return stops.map((stop) => {
-      const id =
-        type === 'train'
-          ? stop?.stationId ?? stop?.stopId ?? null
-          : stop?.stopId ?? stop?.stationId ?? null;
-      const name = String(stop?.displayName ?? stop?.stopName ?? '').trim();
-
-      return {
-        id: id === null ? '' : String(id),
-        name: name || 'Unknown'
-      };
-    });
-  }
-
-  function debugApiCallMeta(entry) {
-    try {
-      const origin = typeof window !== 'undefined' ? window.location.origin : 'http://localhost';
-      const parsed = new URL(entry?.url ?? '', origin);
-      return {
-        href: parsed.toString(),
-        params: Object.fromEntries(parsed.searchParams.entries())
-      };
-    } catch {
-      return {
-        href: String(entry?.url ?? ''),
-        params: {}
-      };
-    }
-  }
-
-  function debugApiItems(entry) {
-    if (!entry?.payload) {
-      return [];
-    }
-
-    if (entry.mode === 'train') {
-      const eta = entry.payload?.ctatt?.eta;
-      return Array.isArray(eta) ? eta : eta ? [eta] : [];
-    }
-
-    if (entry.mode === 'bus') {
-      const prd = entry.payload?.['bustime-response']?.prd;
-      return Array.isArray(prd) ? prd : prd ? [prd] : [];
-    }
-
-    return [];
-  }
-
-  function debugApiItemCount(entry) {
-    return debugApiItems(entry).length;
-  }
-
-  function debugModeItemCount(entries) {
-    return entries.reduce((sum, entry) => sum + debugApiItemCount(entry), 0);
   }
 
   async function ensureLeaflet() {
@@ -188,11 +128,10 @@
 
     loading = true;
     errorMessage = '';
+    foundBusStops = [];
+    foundTrainStations = [];
     nearbyStops = [];
     if (IS_DEV) {
-      debugUserLocation = null;
-      debugFilteredBusStops = [];
-      debugFilteredTrainStations = [];
       debugFilteredBusApiStops = [];
       debugFilteredTrainApiStations = [];
       debugApiResponses = [];
@@ -203,9 +142,6 @@
     try {
       loadingMessage = 'Requesting your location...';
       userLocation = await getUserLocation();
-      if (IS_DEV) {
-        debugUserLocation = userLocation;
-      }
       if (currentNonce !== loadNonce) {
         return;
       }
@@ -219,20 +155,18 @@
         return;
       }
 
-      const nearbyTrainStations = withinRadius(
+      foundTrainStations = withinRadius(
         parseTrainStations(trainCsv),
         userLocation,
         SEARCH_RADIUS_MILES
       );
 
-      const nearbyBusStops = withinRadius(parseBusStops(busCsv), userLocation, SEARCH_RADIUS_MILES);
-      const candidateTrainStations = nearbyTrainStations;
-      const candidateBusStops = nearbyBusStops.slice(0, 10);
+      foundBusStops = withinRadius(parseBusStops(busCsv), userLocation, SEARCH_RADIUS_MILES);
+      const candidateTrainStations = foundTrainStations;
+      const candidateBusStops = foundBusStops.slice(0, 10);
       if (IS_DEV) {
-        debugFilteredTrainStations = nearbyTrainStations;
-        debugFilteredBusStops = nearbyBusStops;
-        debugFilteredTrainApiStations = debugStopIdentityList(candidateTrainStations, 'train');
-        debugFilteredBusApiStops = debugStopIdentityList(candidateBusStops, 'bus');
+        debugFilteredTrainApiStations = candidateTrainStations;
+        debugFilteredBusApiStops = candidateBusStops;
       }
 
       loadingMessage = 'Loading train and bus ETAs...';
@@ -260,7 +194,7 @@
         return;
       }
 
-      const enrichedTrainStops = buildTrainStopsFromArrivals(nearbyTrainStations, trainData.arrivals);
+      const enrichedTrainStops = buildTrainStopsFromArrivals(foundTrainStations, trainData.arrivals);
       const enrichedBusStops = buildBusStopsFromArrivals(candidateBusStops, busData.arrivals);
       const wrangledStops = [...enrichedTrainStops, ...enrichedBusStops];
       if (IS_DEV) {
@@ -325,8 +259,6 @@
   ];
 
   $: upcomingStops = buildUpcomingStops(nearbyStops, { walkSpeedMph: WALK_SPEED_MPH });
-  $: debugTrainApiResponses = debugApiResponses.filter((entry) => entry.mode === 'train');
-  $: debugBusApiResponses = debugApiResponses.filter((entry) => entry.mode === 'bus');
 </script>
 
 <svelte:head>
@@ -395,118 +327,17 @@
   </section>
 
   {#if IS_DEV}
-    <section class="debug">
-      <h2>Debug</h2>
-      <details open>
-        <summary>Query Basis (User Location)</summary>
-        <pre>{JSON.stringify(debugUserLocation, null, 2)}</pre>
-      </details>
-
-      <details>
-        <summary>Found</summary>
-        <details class="debug-subsection">
-          <summary>Bus Stops ({debugFilteredBusStops.length})</summary>
-          <pre>{JSON.stringify(debugFilteredBusStops, null, 2)}</pre>
-        </details>
-        <details class="debug-subsection">
-          <summary>Train Stations ({debugFilteredTrainStations.length})</summary>
-          <pre>{JSON.stringify(debugFilteredTrainStations, null, 2)}</pre>
-        </details>
-      </details>
-
-      <details>
-        <summary>Filtered</summary>
-        <details class="debug-subsection">
-          <summary>Bus Stops for API ({debugFilteredBusApiStops.length})</summary>
-          {#if debugFilteredBusApiStops.length === 0}
-            <p class="debug-empty">No bus stops selected for API fetches.</p>
-          {:else}
-            <ul class="debug-id-list">
-              {#each debugFilteredBusApiStops as stop}
-                <li><code>{stop.id}</code> {stop.name}</li>
-              {/each}
-            </ul>
-          {/if}
-        </details>
-
-        <details class="debug-subsection">
-          <summary>Train Stations for API ({debugFilteredTrainApiStations.length})</summary>
-          {#if debugFilteredTrainApiStations.length === 0}
-            <p class="debug-empty">No train stations selected for API fetches.</p>
-          {:else}
-            <ul class="debug-id-list">
-              {#each debugFilteredTrainApiStations as station}
-                <li><code>{station.id}</code> {station.name}</li>
-              {/each}
-            </ul>
-          {/if}
-        </details>
-      </details>
-
-      <details>
-        <summary>API Responses ({debugApiResponses.length})</summary>
-        {#if debugApiResponses.length === 0}
-          <p class="debug-empty">No API responses captured yet.</p>
-        {:else}
-          <details class="debug-subsection">
-            <summary>Train Calls ({debugTrainApiResponses.length}, {debugModeItemCount(debugTrainApiResponses)} eta items)</summary>
-            {#if debugTrainApiResponses.length === 0}
-              <p class="debug-empty">No train API calls captured.</p>
-            {:else}
-              {#each debugTrainApiResponses as response, index}
-                {@const meta = debugApiCallMeta(response)}
-                <details class="debug-call">
-                  <summary>Call {index + 1} ({debugApiItemCount(response)} eta items)</summary>
-                  <p><strong>URL:</strong> <code>{meta.href}</code></p>
-                  <p><strong>Params:</strong></p>
-                  <pre>{JSON.stringify(meta.params, null, 2)}</pre>
-                  <p><strong>Response:</strong></p>
-                  <pre>{JSON.stringify(response.payload, null, 2)}</pre>
-                </details>
-              {/each}
-            {/if}
-          </details>
-
-          <details class="debug-subsection">
-            <summary>Bus Calls ({debugBusApiResponses.length}, {debugModeItemCount(debugBusApiResponses)} prd items)</summary>
-            {#if debugBusApiResponses.length === 0}
-              <p class="debug-empty">No bus API calls captured.</p>
-            {:else}
-              {#each debugBusApiResponses as response, index}
-                {@const meta = debugApiCallMeta(response)}
-                <details class="debug-call">
-                  <summary>Call {index + 1} ({debugApiItemCount(response)} prd items)</summary>
-                  <p><strong>URL:</strong> <code>{meta.href}</code></p>
-                  <p><strong>Params:</strong></p>
-                  <pre>{JSON.stringify(meta.params, null, 2)}</pre>
-                  <p><strong>Response:</strong></p>
-                  <pre>{JSON.stringify(response.payload, null, 2)}</pre>
-                </details>
-              {/each}
-            {/if}
-          </details>
-        {/if}
-      </details>
-
-      <details>
-        <summary>Wrangled TransitArrival List ({debugWrangledTransitArrivals.length})</summary>
-        <pre>{JSON.stringify(debugWrangledTransitArrivals, null, 2)}</pre>
-      </details>
-
-      <details>
-        <summary>TransitStop Objects ({debugTransitStops.length})</summary>
-        {#if debugTransitStops.length === 0}
-          <p class="debug-empty">No TransitStop objects available.</p>
-        {:else}
-          {#each debugTransitStops as stop, index}
-            <div class="debug-stop-object">
-              <h3>{stop?.name || `Stop ${index + 1}`} - {stop?.type || 'unknown'} stop</h3>
-              <pre>{JSON.stringify(stop, null, 2)}</pre>
-            </div>
-          {/each}
-        {/if}
-      </details>
-    </section>
+    <DebugPanel
+      {userLocation}
+      {foundBusStops}
+      {foundTrainStations}
+      filteredBusApiStops={debugFilteredBusApiStops}
+      filteredTrainApiStations={debugFilteredTrainApiStations}
+      searchRadiusMiles={SEARCH_RADIUS_MILES}
+      apiResponses={debugApiResponses}
+      wrangledTransitArrivals={debugWrangledTransitArrivals}
+      transitStops={debugTransitStops}
+    />
   {/if}
 </main>
 
@@ -726,108 +557,6 @@
     color: #5c6676;
     font-size: 0.95rem;
     margin-top: 8px;
-  }
-
-  .debug {
-    margin: 0 0 28px;
-    padding: 10px;
-    border: 1px solid #dbe4ef;
-    border-radius: 10px;
-    background: #ffffff;
-  }
-
-  .debug details {
-    border-top: 1px solid #edf1f8;
-    padding: 8px 0;
-  }
-
-  .debug details:first-of-type {
-    border-top: 0;
-    padding-top: 0;
-  }
-
-  .debug summary {
-    cursor: pointer;
-    font-weight: 600;
-    color: #1f2937;
-  }
-
-  .debug pre {
-    margin: 8px 0 0;
-    max-height: 240px;
-    overflow: auto;
-    background: #f8fafc;
-    border: 1px solid #e2e8f0;
-    border-radius: 8px;
-    padding: 8px;
-    font-size: 0.75rem;
-    line-height: 1.35;
-  }
-
-  .debug-empty {
-    margin: 8px 0 0;
-    color: #64748b;
-    font-size: 0.85rem;
-  }
-
-  .debug-subsection {
-    margin-top: 10px;
-    padding-top: 10px;
-    border-top: 1px dashed #e2e8f0;
-  }
-
-  .debug-subsection > summary {
-    padding-left: 12px;
-  }
-
-  .debug-subsection p {
-    margin: 0 0 6px;
-    font-size: 0.82rem;
-    color: #334155;
-  }
-
-  .debug-subsection code {
-    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-    font-size: 0.75rem;
-  }
-
-  .debug-id-list {
-    margin: 8px 0 0;
-    padding-left: 18px;
-  }
-
-  .debug-id-list li {
-    margin: 4px 0;
-    font-size: 0.85rem;
-    color: #334155;
-  }
-
-  .debug-stop-object {
-    margin-top: 10px;
-    padding-top: 10px;
-    border-top: 1px dotted #e2e8f0;
-  }
-
-  .debug-stop-object h3 {
-    margin: 0 0 6px;
-    font-size: 0.9rem;
-    font-weight: 700;
-    color: #1f2937;
-  }
-
-  .debug-call {
-    margin-top: 8px;
-    padding-top: 8px;
-    border-top: 1px dotted #e2e8f0;
-  }
-
-  .debug-call > summary {
-    padding-left: 24px;
-  }
-
-  .debug-call:first-of-type {
-    border-top: 0;
-    padding-top: 0;
   }
 
   @media (min-width: 900px) {
