@@ -3,6 +3,7 @@ import {
   fetchBusPredictions,
   fetchTrainPredictions,
 } from "$lib/arrivals/predictions";
+import { TransitArrival } from "$lib/arrivals/TransitArrival";
 
 function jsonResponse(payload) {
   return {
@@ -77,6 +78,8 @@ describe("fetchTrainPredictions", () => {
 
     expect(result.selectedStopIds.has("30170")).toBe(true);
     expect(result.selectedStopIds.has("30200")).toBe(true);
+    expect(result.arrivals.every((arrival) => arrival instanceof TransitArrival)).toBe(true);
+    expect(result.arrivals.some((arrival) => arrival.stationId === 30170)).toBe(true);
 
     const station30170 = result.predictionsByStop.get("30170");
     const redHoward = station30170.filter(
@@ -172,6 +175,8 @@ describe("fetchBusPredictions", () => {
       baseOrigin: "https://example.test",
     });
 
+    expect(result.arrivals.every((arrival) => arrival instanceof TransitArrival)).toBe(true);
+    expect(result.arrivals.every((arrival) => arrival.stationId === null)).toBe(true);
     expect([...result.selectedStopIds].sort()).toEqual(["5001", "5002", "5003"]);
     expect(result.predictionsByStop.get("5001")).toHaveLength(2);
     expect(result.predictionsByStop.get("5002")).toHaveLength(2);

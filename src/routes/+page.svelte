@@ -5,10 +5,12 @@
   import { TRAIN_LINE_META, parseBusStops, parseTrainStations, withinRadius } from '$lib/cta';
   import { apiEndpoint, fetchText, withBasePath } from '$lib/api';
   import { getUserLocation } from '$lib/location';
+  import { TransitArrival } from '$lib/arrivals/TransitArrival';
+  import { TransitStop as TransitStopModel } from '$lib/arrivals/TransitStop';
   import { fetchBusPredictions, fetchTrainPredictions } from '$lib/arrivals/predictions';
-  import { buildUpcomingStops, groupBusStopsByName } from '$lib/arrivals/grouping';
-  import { etaUnitText, etaValueText } from '$lib/arrivals/formatting';
+  import { buildBusStopsFromArrivals, buildTrainStopsFromArrivals, buildUpcomingStops } from '$lib/arrivals/grouping';
   import { markerIcon, popupHtml } from '$lib/map/markers';
+  import TransitStopItem from '$lib/components/TransitStop.svelte';
 
   const SEARCH_RADIUS_MILES = 1;
   const WALK_SPEED_MPH = 2;
@@ -26,6 +28,98 @@
   let L;
 
   let loadNonce = 0;
+  const IS_DEV = import.meta.env.DEV;
+  let debugUserLocation = null;
+  let debugFilteredBusStops = [];
+  let debugFilteredTrainStations = [];
+  let debugFilteredBusApiStops = [];
+  let debugFilteredTrainApiStations = [];
+  let debugApiResponses = [];
+  let debugWrangledTransitArrivals = [];
+  let debugTransitStops = [];
+  let debugTrainApiResponses = [];
+  let debugBusApiResponses = [];
+
+  function debugArrivalSnapshot(arrivals) {
+    return arrivals.map((arrival) => arrival.toPrediction());
+  }
+
+  function debugTransitStopSnapshot(stops, { walkSpeedMph = WALK_SPEED_MPH } = {}) {
+    return stops.map((stop) => {
+      const transitStop =
+        stop instanceof TransitStopModel ? stop : TransitStopModel.fromStopData(stop);
+      const distance = transitStop.distanceFromUser({ walkSpeedMph });
+      const grouped = transitStop.groupArrivals({ walkSpeedMph });
+
+      return {
+        stopId: transitStop.stopId,
+        name: transitStop.name,
+        type: transitStop.type,
+        distanceMiles: transitStop.distanceMiles,
+        distance,
+        arrivalCount: transitStop.arrivals.length,
+        arrivals: transitStop.arrivals.map((arrival) => arrival.toPrediction()),
+        groupedArrivals: grouped
+      };
+    });
+  }
+
+  function debugStopIdentityList(stops, type) {
+    return stops.map((stop) => {
+      const id =
+        type === 'train'
+          ? stop?.stationId ?? stop?.stopId ?? null
+          : stop?.stopId ?? stop?.stationId ?? null;
+      const name = String(stop?.displayName ?? stop?.stopName ?? '').trim();
+
+      return {
+        id: id === null ? '' : String(id),
+        name: name || 'Unknown'
+      };
+    });
+  }
+
+  function debugApiCallMeta(entry) {
+    try {
+      const origin = typeof window !== 'undefined' ? window.location.origin : 'http://localhost';
+      const parsed = new URL(entry?.url ?? '', origin);
+      return {
+        href: parsed.toString(),
+        params: Object.fromEntries(parsed.searchParams.entries())
+      };
+    } catch {
+      return {
+        href: String(entry?.url ?? ''),
+        params: {}
+      };
+    }
+  }
+
+  function debugApiItems(entry) {
+    if (!entry?.payload) {
+      return [];
+    }
+
+    if (entry.mode === 'train') {
+      const eta = entry.payload?.ctatt?.eta;
+      return Array.isArray(eta) ? eta : eta ? [eta] : [];
+    }
+
+    if (entry.mode === 'bus') {
+      const prd = entry.payload?.['bustime-response']?.prd;
+      return Array.isArray(prd) ? prd : prd ? [prd] : [];
+    }
+
+    return [];
+  }
+
+  function debugApiItemCount(entry) {
+    return debugApiItems(entry).length;
+  }
+
+  function debugModeItemCount(entries) {
+    return entries.reduce((sum, entry) => sum + debugApiItemCount(entry), 0);
+  }
 
   async function ensureLeaflet() {
     if (L) {
@@ -95,10 +189,23 @@
     loading = true;
     errorMessage = '';
     nearbyStops = [];
+    if (IS_DEV) {
+      debugUserLocation = null;
+      debugFilteredBusStops = [];
+      debugFilteredTrainStations = [];
+      debugFilteredBusApiStops = [];
+      debugFilteredTrainApiStations = [];
+      debugApiResponses = [];
+      debugWrangledTransitArrivals = [];
+      debugTransitStops = [];
+    }
 
     try {
       loadingMessage = 'Requesting your location...';
       userLocation = await getUserLocation();
+      if (IS_DEV) {
+        debugUserLocation = userLocation;
+      }
       if (currentNonce !== loadNonce) {
         return;
       }
@@ -119,30 +226,53 @@
       );
 
       const nearbyBusStops = withinRadius(parseBusStops(busCsv), userLocation, SEARCH_RADIUS_MILES);
+      const candidateTrainStations = nearbyTrainStations;
       const candidateBusStops = nearbyBusStops.slice(0, 10);
+      if (IS_DEV) {
+        debugFilteredTrainStations = nearbyTrainStations;
+        debugFilteredBusStops = nearbyBusStops;
+        debugFilteredTrainApiStations = debugStopIdentityList(candidateTrainStations, 'train');
+        debugFilteredBusApiStops = debugStopIdentityList(candidateBusStops, 'bus');
+      }
 
       loadingMessage = 'Loading train and bus ETAs...';
       const [trainData, busData] = await Promise.all([
-        fetchTrainPredictions(nearbyTrainStations, { endpoint: apiEndpoint('api/train') }),
-        fetchBusPredictions(candidateBusStops, { endpoint: apiEndpoint('api/bus') })
+        fetchTrainPredictions(candidateTrainStations, {
+          endpoint: apiEndpoint('api/train'),
+          onApiResponse: (entry) => {
+            if (currentNonce !== loadNonce || !IS_DEV) {
+              return;
+            }
+            debugApiResponses = [...debugApiResponses, entry];
+          }
+        }),
+        fetchBusPredictions(candidateBusStops, {
+          endpoint: apiEndpoint('api/bus'),
+          onApiResponse: (entry) => {
+            if (currentNonce !== loadNonce || !IS_DEV) {
+              return;
+            }
+            debugApiResponses = [...debugApiResponses, entry];
+          }
+        })
       ]);
       if (currentNonce !== loadNonce) {
         return;
       }
 
-      const enrichedTrainStops = nearbyTrainStations
-        .filter((stop) => trainData.selectedStopIds.has(stop.stopId))
-        .map((stop) => ({
-          ...stop,
-          predictions: trainData.predictionsByStop.get(stop.stopId) ?? []
-        }))
-        .filter((stop) => stop.predictions.length > 0);
+      const enrichedTrainStops = buildTrainStopsFromArrivals(nearbyTrainStations, trainData.arrivals);
+      const enrichedBusStops = buildBusStopsFromArrivals(candidateBusStops, busData.arrivals);
+      const wrangledStops = [...enrichedTrainStops, ...enrichedBusStops];
+      if (IS_DEV) {
+        const transitStops = wrangledStops.map((stop) => TransitStopModel.fromStopData(stop));
+        const wrangledArrivals = transitStops.flatMap((stop) => stop.arrivals);
+        debugWrangledTransitArrivals = debugArrivalSnapshot(wrangledArrivals);
+        debugTransitStops = debugTransitStopSnapshot(transitStops, {
+          walkSpeedMph: WALK_SPEED_MPH
+        });
+      }
 
-      const enrichedBusStops = groupBusStopsByName(candidateBusStops, busData).filter(
-        (stop) => stop.predictions.length > 0
-      );
-
-      nearbyStops = [...enrichedTrainStops, ...enrichedBusStops].sort(
+      nearbyStops = wrangledStops.sort(
         (a, b) => a.distanceMiles - b.distanceMiles
       );
 
@@ -195,6 +325,8 @@
   ];
 
   $: upcomingStops = buildUpcomingStops(nearbyStops, { walkSpeedMph: WALK_SPEED_MPH });
+  $: debugTrainApiResponses = debugApiResponses.filter((entry) => entry.mode === 'train');
+  $: debugBusApiResponses = debugApiResponses.filter((entry) => entry.mode === 'bus');
 </script>
 
 <svelte:head>
@@ -250,101 +382,132 @@
     <h2>Upcoming Arrivals</h2>
 
     {#if !loading && !errorMessage && nearbyStops.length === 0}
-      <p class="empty">No CTA stops found in the default 0.5-mile radius.</p>
+      <p class="empty">No CTA stops found in a {SEARCH_RADIUS_MILES}-mile radius.</p>
     {:else if !loading && !errorMessage && upcomingStops.length === 0}
       <p class="empty">No live arrivals available right now.</p>
     {:else if upcomingStops.length > 0}
       <ul class="arrival-list">
         {#each upcomingStops as stop}
-          <li class="arrival-item">
-            <div class="stop-header">
-
-              <span class="stop-name">
-                <span class="arrival-emoji">{stop.icon}</span>
-                  <span class="name">{stop.stopName}</span>
-                  <span class="category">{stop.stopCategory}</span>
-
-
-              </span>
-
-              <span class="stop-info">
-                <span class="distance">{stop.distanceText}</span>
-                <span>({stop.walkText})</span>
-
-              </span>
-
-            </div>
-
-            <ul class="route-list">
-              {#if stop.type === 'train'}
-                {#each stop.routes as route}
-                  <li class="direction-group-item">
-                    <ul class="direction-list">
-                      {#each route.destinations as destination, destinationIndex}
-                        <li class="route-item train">
-                          <span class="group-label" class:ghost={destinationIndex > 0}>
-                            <span class="route-name train {route.route.toLowerCase()}">
-                              {route.route}
-                              <span class="route-type">Line</span>
-                            </span>
-                          </span>
-                          <span class="route-label arrival-emphasis">{destination.direction}</span>
-                          <span class="eta-stack">
-                            {#each destination.etas as eta}
-                              <span class="eta-line">
-                                <span class={`eta-part eta-min ${eta.timingClass} ${eta.descriptor}`}>
-                                  <span class="eta-value">{etaValueText(eta.minutes)}</span>
-                                  {#if etaUnitText(eta.minutes)}
-                                    <span class="eta-unit">{etaUnitText(eta.minutes)}</span>
-                                  {/if}
-                                </span>
-                                <span class={`eta-part clock`}>{eta.clockText}</span>
-                              </span>
-                            {/each}
-                          </span>
-                        </li>
-                      {/each}
-                    </ul>
-                  </li>
-                {/each}
-              {:else}
-                {#each stop.directions as direction}
-                  <li class="direction-group-item">
-                    <ul class="direction-list">
-                      {#each direction.routes as route, routeIndex}
-                        <li class="route-item bus">
-                          <span class="group-label arrival-emphasis" class:ghost={routeIndex > 0}>
-                            {direction.direction}
-                          </span>
-                          <span class="route-label">
-                            <span class="route-name">{route.route}</span>
-                            <span class="route-type">{route.typeLabel}</span>
-                          </span>
-                          <span class="eta-stack">
-                            {#each route.etas as eta}
-                              <span class="eta-line">
-                                <span class={`eta-part eta-min ${eta.timingClass} ${eta.descriptor}`}>
-                                  <span class="eta-value">{etaValueText(eta.minutes)}</span>
-                                  {#if etaUnitText(eta.minutes)}
-                                    <span class="eta-unit">{etaUnitText(eta.minutes)}</span>
-                                  {/if}
-                                </span>
-                                <span class={`eta-part clock`}>{eta.clockText}</span>
-                              </span>
-                            {/each}
-                          </span>
-                        </li>
-                      {/each}
-                    </ul>
-                  </li>
-                {/each}
-              {/if}
-            </ul>
-          </li>
+          <TransitStopItem {stop} />
         {/each}
       </ul>
     {/if}
   </section>
+
+  {#if IS_DEV}
+    <section class="debug">
+      <h2>Debug</h2>
+      <details open>
+        <summary>Query Basis (User Location)</summary>
+        <pre>{JSON.stringify(debugUserLocation, null, 2)}</pre>
+      </details>
+
+      <details>
+        <summary>Found</summary>
+        <details class="debug-subsection">
+          <summary>Bus Stops ({debugFilteredBusStops.length})</summary>
+          <pre>{JSON.stringify(debugFilteredBusStops, null, 2)}</pre>
+        </details>
+        <details class="debug-subsection">
+          <summary>Train Stations ({debugFilteredTrainStations.length})</summary>
+          <pre>{JSON.stringify(debugFilteredTrainStations, null, 2)}</pre>
+        </details>
+      </details>
+
+      <details>
+        <summary>Filtered</summary>
+        <details class="debug-subsection">
+          <summary>Bus Stops for API ({debugFilteredBusApiStops.length})</summary>
+          {#if debugFilteredBusApiStops.length === 0}
+            <p class="debug-empty">No bus stops selected for API fetches.</p>
+          {:else}
+            <ul class="debug-id-list">
+              {#each debugFilteredBusApiStops as stop}
+                <li><code>{stop.id}</code> {stop.name}</li>
+              {/each}
+            </ul>
+          {/if}
+        </details>
+
+        <details class="debug-subsection">
+          <summary>Train Stations for API ({debugFilteredTrainApiStations.length})</summary>
+          {#if debugFilteredTrainApiStations.length === 0}
+            <p class="debug-empty">No train stations selected for API fetches.</p>
+          {:else}
+            <ul class="debug-id-list">
+              {#each debugFilteredTrainApiStations as station}
+                <li><code>{station.id}</code> {station.name}</li>
+              {/each}
+            </ul>
+          {/if}
+        </details>
+      </details>
+
+      <details>
+        <summary>API Responses ({debugApiResponses.length})</summary>
+        {#if debugApiResponses.length === 0}
+          <p class="debug-empty">No API responses captured yet.</p>
+        {:else}
+          <details class="debug-subsection">
+            <summary>Train Calls ({debugTrainApiResponses.length}, {debugModeItemCount(debugTrainApiResponses)} eta items)</summary>
+            {#if debugTrainApiResponses.length === 0}
+              <p class="debug-empty">No train API calls captured.</p>
+            {:else}
+              {#each debugTrainApiResponses as response, index}
+                {@const meta = debugApiCallMeta(response)}
+                <details class="debug-call">
+                  <summary>Call {index + 1} ({debugApiItemCount(response)} eta items)</summary>
+                  <p><strong>URL:</strong> <code>{meta.href}</code></p>
+                  <p><strong>Params:</strong></p>
+                  <pre>{JSON.stringify(meta.params, null, 2)}</pre>
+                  <p><strong>Response:</strong></p>
+                  <pre>{JSON.stringify(response.payload, null, 2)}</pre>
+                </details>
+              {/each}
+            {/if}
+          </details>
+
+          <details class="debug-subsection">
+            <summary>Bus Calls ({debugBusApiResponses.length}, {debugModeItemCount(debugBusApiResponses)} prd items)</summary>
+            {#if debugBusApiResponses.length === 0}
+              <p class="debug-empty">No bus API calls captured.</p>
+            {:else}
+              {#each debugBusApiResponses as response, index}
+                {@const meta = debugApiCallMeta(response)}
+                <details class="debug-call">
+                  <summary>Call {index + 1} ({debugApiItemCount(response)} prd items)</summary>
+                  <p><strong>URL:</strong> <code>{meta.href}</code></p>
+                  <p><strong>Params:</strong></p>
+                  <pre>{JSON.stringify(meta.params, null, 2)}</pre>
+                  <p><strong>Response:</strong></p>
+                  <pre>{JSON.stringify(response.payload, null, 2)}</pre>
+                </details>
+              {/each}
+            {/if}
+          </details>
+        {/if}
+      </details>
+
+      <details>
+        <summary>Wrangled TransitArrival List ({debugWrangledTransitArrivals.length})</summary>
+        <pre>{JSON.stringify(debugWrangledTransitArrivals, null, 2)}</pre>
+      </details>
+
+      <details>
+        <summary>TransitStop Objects ({debugTransitStops.length})</summary>
+        {#if debugTransitStops.length === 0}
+          <p class="debug-empty">No TransitStop objects available.</p>
+        {:else}
+          {#each debugTransitStops as stop, index}
+            <div class="debug-stop-object">
+              <h3>{stop?.name || `Stop ${index + 1}`} - {stop?.type || 'unknown'} stop</h3>
+              <pre>{JSON.stringify(stop, null, 2)}</pre>
+            </div>
+          {/each}
+        {/if}
+      </details>
+    </section>
+  {/if}
 </main>
 
 <style>
@@ -544,215 +707,18 @@
     overflow: hidden;
   }
 
-  .arrival-item {
-    padding: 7px 10px;
-    border-top: 1px solid #edf1f8;
-    font-size: 0.88rem;
-    line-height: 1.25;
-  }
-
-  .arrival-item:first-child {
-    border-top: 0;
-  }
-
-  .arrival-emoji {
-    margin-right: 6px;
-  }
-
-  .arrival-record {
-    margin-bottom: 1.0em;
-  }
-  .stop-header {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: 4px;
-  }
-
-  .route-list {
-    list-style: none;
-    margin: 4px 0 0 0;
-    padding: 0 0 0 0px;
-  }
-
-  .direction-group-item {
-    margin: 2px 0;
-    display: block;
-  }
-
-
-  .route-name {
-    font-weight: 400;
-    padding: 0.1rem 0.2rem;
-    border: thin solid gray;
-  }
-
-  .route-name.bus{
-    align-self: flex-start;
-    font-weight: 600;
-    border-radius: 5%;
-  }
-
-  .route-name.train{
-     font-weight: 600;
-     color: white;
-  }
-
- .route-name.blue{
-    background: #0000cc;
-  }
-
-  .route-name.brown{
-    background: brown;
-  }
-
-
- .route-name.green{
-    background: #00cc00;
-  }
-
- .route-name.orange{
-    background: orange;
-  }
-
- .route-name.purple{
-    background: purple;
-  }
-  .route-name.red{
-    background: #cc0000;
-  }
-
-  .route-name.yellow{
-    background: yellow;
-  }
-
-
-  .arrival-emphasis {
-    font-weight: 600;
-    color: #334155;
-  }
-
-  .direction-list {
-    list-style: none;
-    margin: 0 0 0.5rem 0;
-    padding: 0 0 0 0px;
-    width: 100%;
-  }
-
-  .route-item {
-    display: grid;
-    grid-template-columns: minmax(96px, max-content) minmax(0, 1fr) max-content max-content;
-    align-items: baseline;
-    column-gap: 8px;
-    margin-top: 1px;
-    margin-bottom: 0.2rem;
-    width: 100%;
-  }
-
-  .group-label {
-    display: inline-flex;
-    align-items: baseline;
-    white-space: nowrap;
-  }
-
-  .group-label.ghost {
-    visibility: hidden;
-  }
-
-  .route-label {
-    display: inline-flex;
-    align-items: baseline;
-    gap: 6px;
-    min-width: 0;
-    white-space: nowrap;
-  }
-
-  .route-item.bus .route-type {
-    display: none;
-  }
-
-  .eta-stack {
-    grid-column: 3 / span 2;
-    display: grid;
-    grid-auto-rows: min-content;
-    align-items: flex-start;
-    row-gap: 2px;
-    width: 100%;
-  }
-
-  .eta-line {
-    display: grid;
-    grid-template-columns: max-content max-content;
-    align-items: baseline;
-    column-gap: 10px;
-    justify-content: end;
-    white-space: nowrap;
-    width: 100%;
-  }
-
-  .eta-min {
-    display: inline-flex;
-    align-items: baseline;
-    gap: 3px;
-    justify-self: end;
-  }
-
-  .eta-part {
-    white-space: nowrap;
-  }
-
-  .eta-value {
-    text-align: right;
-  }
-
-  .eta-part.clock {
-    font-size: 0.9rem;
-    font-weight: 300;
-  }
-
-  .eta-prefix {
-    display: inline-block;
-    min-width: 58px;
-    color: #344054;
-  }
-
-  .eta-prefix.ghost {
-    visibility: hidden;
-  }
-
-  .eta-unit {
-    color: #344054;
-  }
-
-  .eta-too-far,
   :global(.popup .eta-too-far) {
     color: #770022;
     font-weight: 400;
   }
 
-  .eta-near,
   :global(.popup .eta-near) {
     color: #665522;
     font-weight: 600;
   }
 
-  .eta-normal,
   :global(.popup .eta-normal) {
     color: #222222;
-    font-weight: 400;
-  }
-
-  .stop-name {
-    font-size: 1.1em;
-    font-weight: 700;
-    color: #0f172a;
-  }
-
-  .stop-info{
-    margin-left: 0.5em;
-  }
-  .distance {
-    color: #475569;
     font-weight: 400;
   }
 
@@ -760,6 +726,108 @@
     color: #5c6676;
     font-size: 0.95rem;
     margin-top: 8px;
+  }
+
+  .debug {
+    margin: 0 0 28px;
+    padding: 10px;
+    border: 1px solid #dbe4ef;
+    border-radius: 10px;
+    background: #ffffff;
+  }
+
+  .debug details {
+    border-top: 1px solid #edf1f8;
+    padding: 8px 0;
+  }
+
+  .debug details:first-of-type {
+    border-top: 0;
+    padding-top: 0;
+  }
+
+  .debug summary {
+    cursor: pointer;
+    font-weight: 600;
+    color: #1f2937;
+  }
+
+  .debug pre {
+    margin: 8px 0 0;
+    max-height: 240px;
+    overflow: auto;
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    padding: 8px;
+    font-size: 0.75rem;
+    line-height: 1.35;
+  }
+
+  .debug-empty {
+    margin: 8px 0 0;
+    color: #64748b;
+    font-size: 0.85rem;
+  }
+
+  .debug-subsection {
+    margin-top: 10px;
+    padding-top: 10px;
+    border-top: 1px dashed #e2e8f0;
+  }
+
+  .debug-subsection > summary {
+    padding-left: 12px;
+  }
+
+  .debug-subsection p {
+    margin: 0 0 6px;
+    font-size: 0.82rem;
+    color: #334155;
+  }
+
+  .debug-subsection code {
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 0.75rem;
+  }
+
+  .debug-id-list {
+    margin: 8px 0 0;
+    padding-left: 18px;
+  }
+
+  .debug-id-list li {
+    margin: 4px 0;
+    font-size: 0.85rem;
+    color: #334155;
+  }
+
+  .debug-stop-object {
+    margin-top: 10px;
+    padding-top: 10px;
+    border-top: 1px dotted #e2e8f0;
+  }
+
+  .debug-stop-object h3 {
+    margin: 0 0 6px;
+    font-size: 0.9rem;
+    font-weight: 700;
+    color: #1f2937;
+  }
+
+  .debug-call {
+    margin-top: 8px;
+    padding-top: 8px;
+    border-top: 1px dotted #e2e8f0;
+  }
+
+  .debug-call > summary {
+    padding-left: 24px;
+  }
+
+  .debug-call:first-of-type {
+    border-top: 0;
+    padding-top: 0;
   }
 
   @media (min-width: 900px) {
@@ -783,30 +851,6 @@
       grid-column: 2;
       grid-row: 2;
     }
-
-    .arrival-item {
-      padding: 10px 12px;
-      font-size: 0.98rem;
-      line-height: 1.35;
-    }
-
-    .stop-name {
-      font-size: 1.22em;
-    }
-
-    .route-list,
-    .direction-list,
-    .route-item {
-      max-width: 40rem;
-    }
-
-    .route-item {
-      column-gap: 6px;
-    }
-
-    .eta-part.clock {
-      font-size: 0.95rem;
-    }
   }
 
   header.site-title{
@@ -827,16 +871,6 @@
     .map {
       height: 46vh;
       border-radius: 12px;
-    }
-
-    .arrival-item {
-      padding: 6px 8px;
-      font-size: 0.84rem;
-      line-height: 1.2;
-    }
-
-    .route-list {
-      padding-left: 0px;
     }
   }
 </style>

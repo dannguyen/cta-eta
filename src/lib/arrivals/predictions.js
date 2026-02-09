@@ -34,6 +34,7 @@ export async function fetchTrainPredictions(
     endpoint = "/api/train",
     fetchFn = fetch,
     baseOrigin = defaultBaseOrigin(),
+    onApiResponse = null,
   } = {},
 ) {
   const distanceByStationId = new Map(
@@ -41,6 +42,10 @@ export async function fetchTrainPredictions(
       String(stop.stationId ?? stop.stopId),
       stop.distanceMiles,
     ]),
+  );
+
+  const stationById = new Map(
+    stops.map((stop) => [String(stop.stationId ?? stop.stopId), stop]),
   );
 
   const perStationPredictions = await Promise.all(
@@ -51,6 +56,13 @@ export async function fetchTrainPredictions(
       try {
         const response = await fetchFn(url);
         const payload = await response.json();
+        if (typeof onApiResponse === "function") {
+          onApiResponse({
+            mode: "train",
+            url: url.toString(),
+            payload,
+          });
+        }
 
         if (payload?.ctatt?.errCd && payload.ctatt.errCd !== "0") {
           return [];
@@ -62,10 +74,21 @@ export async function fetchTrainPredictions(
         return etaList.map((eta) =>
           TransitArrival.fromTrainEta(eta, {
             fallbackStopId: stop.stationId ?? stop.stopId,
+            fallbackStationId: stop.stationId ?? stop.stopId,
             fallbackStopName: stop.stationName ?? stop.displayName,
+            stopLatitude: stop.latitude,
+            stopLongitude: stop.longitude,
           }).toPrediction(),
         );
       } catch {
+        if (typeof onApiResponse === "function") {
+          onApiResponse({
+            mode: "train",
+            url: url.toString(),
+            payload: null,
+            error: "request_failed",
+          });
+        }
         return [];
       }
     }),
@@ -86,7 +109,7 @@ export async function fetchTrainPredictions(
 
   for (const group of predictionsByRouteDestination.values()) {
     const stationIds = [
-      ...new Set(group.map((prediction) => String(prediction.stopId))),
+      ...new Set(group.map((prediction) => String(prediction.stationId ?? prediction.stopId))),
     ].filter((stationId) => distanceByStationId.has(stationId));
 
     stationIds.sort(
@@ -101,7 +124,10 @@ export async function fetchTrainPredictions(
     }
 
     const topTwo = group
-      .filter((prediction) => String(prediction.stopId) === chosenStationId)
+      .filter(
+        (prediction) =>
+          String(prediction.stationId ?? prediction.stopId) === chosenStationId,
+      )
       .sort((a, b) => predictionTimestamp(a) - predictionTimestamp(b))
       .slice(0, 2);
 
@@ -111,7 +137,20 @@ export async function fetchTrainPredictions(
 
     selectedStopIds.add(chosenStationId);
     const stationPredictions = results.get(chosenStationId) ?? [];
-    stationPredictions.push(...topTwo);
+    stationPredictions.push(
+      ...topTwo.map((prediction) => ({
+        ...prediction,
+        stationId: prediction.stationId ?? Number.parseInt(chosenStationId, 10),
+        stopLatitude:
+          prediction.stopLatitude ??
+          stationById.get(chosenStationId)?.latitude ??
+          null,
+        stopLongitude:
+          prediction.stopLongitude ??
+          stationById.get(chosenStationId)?.longitude ??
+          null,
+      })),
+    );
     results.set(chosenStationId, stationPredictions);
   }
 
@@ -120,7 +159,12 @@ export async function fetchTrainPredictions(
     results.set(stationId, predictions);
   }
 
+  const arrivals = [...results.values()]
+    .flat()
+    .map((prediction) => TransitArrival.fromPrediction(prediction));
+
   return {
+    arrivals,
     predictionsByStop: results,
     selectedStopIds,
   };
@@ -132,6 +176,7 @@ export async function fetchBusPredictions(
     endpoint = "/api/bus",
     fetchFn = fetch,
     baseOrigin = defaultBaseOrigin(),
+    onApiResponse = null,
   } = {},
 ) {
   const results = new Map(stops.map((stop) => [String(stop.stopId), []]));
@@ -140,6 +185,7 @@ export async function fetchBusPredictions(
   const distanceByStopId = new Map(
     stops.map((stop) => [String(stop.stopId), stop.distanceMiles]),
   );
+  const stopById = new Map(stops.map((stop) => [String(stop.stopId), stop]));
 
   for (const idsChunk of chunk(stopIds, 10)) {
     const url = new URL(endpointUrl(endpoint, baseOrigin));
@@ -149,6 +195,13 @@ export async function fetchBusPredictions(
     try {
       const response = await fetchFn(url);
       const payload = await response.json();
+      if (typeof onApiResponse === "function") {
+        onApiResponse({
+          mode: "bus",
+          url: url.toString(),
+          payload,
+        });
+      }
 
       const rawPredictions = payload?.["bustime-response"]?.prd;
       const predictionList = Array.isArray(rawPredictions)
@@ -158,9 +211,23 @@ export async function fetchBusPredictions(
           : [];
 
       for (const prediction of predictionList) {
-        allPredictions.push(TransitArrival.fromBusPrediction(prediction).toPrediction());
+        const stop = stopById.get(String(prediction.stpid));
+        allPredictions.push(
+          TransitArrival.fromBusPrediction(prediction, {
+            stopLatitude: stop?.latitude ?? null,
+            stopLongitude: stop?.longitude ?? null,
+          }).toPrediction(),
+        );
       }
     } catch {
+      if (typeof onApiResponse === "function") {
+        onApiResponse({
+          mode: "bus",
+          url: url.toString(),
+          payload: null,
+          error: "request_failed",
+        });
+      }
       // A failed chunk should not block the whole app.
     }
   }
@@ -208,7 +275,12 @@ export async function fetchBusPredictions(
     results.set(stopId, predictions);
   }
 
+  const arrivals = [...results.values()]
+    .flat()
+    .map((prediction) => TransitArrival.fromPrediction(prediction));
+
   return {
+    arrivals,
     predictionsByStop: results,
     selectedStopIds,
   };

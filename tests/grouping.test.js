@@ -1,8 +1,11 @@
 import { describe, expect, it } from "vitest";
 import {
+  buildBusStopsFromArrivals,
+  buildTrainStopsFromArrivals,
   buildUpcomingStops,
   groupBusStopsByName,
 } from "$lib/arrivals/grouping";
+import { TransitArrival } from "$lib/arrivals/TransitArrival";
 
 function makeArrival(minutesFromNow) {
   return new Date(Date.now() + minutesFromNow * 60_000);
@@ -67,6 +70,100 @@ describe("groupBusStopsByName", () => {
     expect(
       grouped[0].predictions.map((prediction) => prediction.direction).sort(),
     ).toEqual(["Northbound", "Southbound"]);
+  });
+});
+
+describe("build stops from TransitArrival instances", () => {
+  it("groups train arrivals by stationId", () => {
+    const trainStations = [
+      {
+        stopId: "30170",
+        stationId: "30170",
+        displayName: "Thorndale",
+        latitude: 41.99,
+        longitude: -87.66,
+        distanceMiles: 0.2,
+        lines: [{ code: "RED", id: "Red", color: "#d7263d" }],
+      },
+    ];
+
+    const arrivals = [
+      TransitArrival.fromPrediction({
+        type: "train",
+        stationId: 30170,
+        stopId: 30170,
+        route: "Red",
+        direction: "Howard",
+        stopName: "Thorndale",
+        arrival: makeArrival(4),
+        minutes: 4,
+      }),
+      TransitArrival.fromPrediction({
+        type: "train",
+        stationId: 30170,
+        stopId: 30170,
+        route: "Red",
+        direction: "95th/Dan Ryan",
+        stopName: "Thorndale",
+        arrival: makeArrival(7),
+        minutes: 7,
+      }),
+    ];
+
+    const stops = buildTrainStopsFromArrivals(trainStations, arrivals);
+    expect(stops).toHaveLength(1);
+    expect(stops[0].stopId).toBe("30170");
+    expect(stops[0].predictions).toHaveLength(2);
+  });
+
+  it("groups bus arrivals by stopName and places stop at midpoint", () => {
+    const candidateBusStops = [
+      {
+        stopId: "1001",
+        displayName: "Sheridan & Winthrop",
+        latitude: 41.98,
+        longitude: -87.66,
+        distanceMiles: 0.2,
+      },
+      {
+        stopId: "1002",
+        displayName: "Sheridan & Winthrop",
+        latitude: 41.9804,
+        longitude: -87.6596,
+        distanceMiles: 0.24,
+      },
+    ];
+
+    const arrivals = [
+      TransitArrival.fromPrediction({
+        type: "bus",
+        stopId: 1001,
+        route: "147",
+        direction: "Northbound",
+        stopName: "Sheridan & Winthrop",
+        stopLatitude: 41.98,
+        stopLongitude: -87.66,
+        arrival: makeArrival(4),
+        minutes: 4,
+      }),
+      TransitArrival.fromPrediction({
+        type: "bus",
+        stopId: 1002,
+        route: "147",
+        direction: "Southbound",
+        stopName: "Sheridan & Winthrop",
+        stopLatitude: 41.9804,
+        stopLongitude: -87.6596,
+        arrival: makeArrival(6),
+        minutes: 6,
+      }),
+    ];
+
+    const stops = buildBusStopsFromArrivals(candidateBusStops, arrivals);
+    expect(stops).toHaveLength(1);
+    expect(stops[0].displayName).toBe("Sheridan & Winthrop");
+    expect(stops[0].latitude).toBeCloseTo((41.98 + 41.9804) / 2, 6);
+    expect(stops[0].longitude).toBeCloseTo((-87.66 + -87.6596) / 2, 6);
   });
 });
 
