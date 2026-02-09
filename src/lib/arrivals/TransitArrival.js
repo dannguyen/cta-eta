@@ -175,28 +175,4 @@ export class TransitArrival {
   getEtaMinutes() {
     return Number.isFinite(this.etaMinutes) ? this.etaMinutes : minutesUntil(this.arrivalTime);
   }
-
-  toPrediction() {
-    return {
-      type: this.type,
-      stationId: this.stationId,
-      stopId: this.stopId,
-      route: this.route,
-      direction: this.direction,
-      arrivalTime: this.arrivalTime,
-      predictionTime: this.predictionTime,
-      vId: this.vId,
-      isDelayed: this.isDelayed,
-      stopName: this.stopName,
-      stopLatitude: this.stopLatitude,
-      stopLongitude: this.stopLongitude,
-      latitude: this.latitude,
-      longitude: this.longitude,
-      heading: this.heading,
-      mode: this.type,
-      destination: this.destination,
-      arrival: this.arrivalTime,
-      minutes: this.getEtaMinutes()
-    };
-  }
 }

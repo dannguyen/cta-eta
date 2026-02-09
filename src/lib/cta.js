@@ -430,8 +430,8 @@ export function nextPerRoute(predictions) {
   const grouped = new Map();
 
   const sorted = [...predictions].sort((a, b) => {
-    const left = a.arrival?.getTime?.() ?? Number.MAX_SAFE_INTEGER;
-    const right = b.arrival?.getTime?.() ?? Number.MAX_SAFE_INTEGER;
+    const left = a.arrivalTime?.getTime?.() ?? Number.MAX_SAFE_INTEGER;
+    const right = b.arrivalTime?.getTime?.() ?? Number.MAX_SAFE_INTEGER;
     return left - right;
   });
 
@@ -443,8 +443,8 @@ export function nextPerRoute(predictions) {
   }
 
   return [...grouped.values()].sort((a, b) => {
-    const left = a.arrival?.getTime?.() ?? Number.MAX_SAFE_INTEGER;
-    const right = b.arrival?.getTime?.() ?? Number.MAX_SAFE_INTEGER;
+    const left = a.arrivalTime?.getTime?.() ?? Number.MAX_SAFE_INTEGER;
+    const right = b.arrivalTime?.getTime?.() ?? Number.MAX_SAFE_INTEGER;
     return left - right;
   });
 }

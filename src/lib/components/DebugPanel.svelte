@@ -6,7 +6,7 @@
   export let filteredTrainApiStations = [];
   export let searchRadiusMiles = 1;
   export let apiResponses = [];
-  export let wrangledTransitArrivals = [];
+  export let wrangledArrivals = [];
   export let transitStops = [];
 
   function apiCallMeta(entry) {
@@ -154,8 +154,8 @@
   </details>
 
   <details>
-    <summary>Wrangled TransitArrival List ({wrangledTransitArrivals.length})</summary>
-    <pre>{JSON.stringify(wrangledTransitArrivals, null, 2)}</pre>
+    <summary>Wrangled TransitArrival List ({wrangledArrivals.length})</summary>
+    <pre>{JSON.stringify(wrangledArrivals, null, 2)}</pre>
   </details>
 
   <details>

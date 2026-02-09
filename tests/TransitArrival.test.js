@@ -38,12 +38,9 @@ describe('TransitArrival.fromBusPrediction', () => {
     expect(arrival.longitude).toBeNull();
     expect(arrival.heading).toBeNull();
     expect(arrival.getEtaMinutes()).toBe(5);
-
-    const prediction = arrival.toPrediction();
-    expect(prediction.mode).toBe('bus');
-    expect(prediction.minutes).toBe(5);
-    expect(prediction.stopLatitude).toBeCloseTo(41.991, 6);
-    expect(prediction.stopLongitude).toBeCloseTo(-87.659, 6);
+    expect(arrival.type).toBe('bus');
+    expect(arrival.stopLatitude).toBeCloseTo(41.991, 6);
+    expect(arrival.stopLongitude).toBeCloseTo(-87.659, 6);
   });
 });
 
@@ -87,10 +84,8 @@ describe('TransitArrival.fromTrainEta', () => {
     expect(arrival.longitude).toBeCloseTo(-87.633, 6);
     expect(arrival.heading).toBe(270);
     expect(arrival.getEtaMinutes()).toBeGreaterThanOrEqual(0);
-
-    const prediction = arrival.toPrediction();
-    expect(prediction.mode).toBe('train');
-    expect(prediction.destination).toBe('Kimball');
-    expect(prediction.stationId).toBe(30170);
+    expect(arrival.type).toBe('train');
+    expect(arrival.destination).toBe('Kimball');
+    expect(arrival.stationId).toBe(30170);
   });
 });

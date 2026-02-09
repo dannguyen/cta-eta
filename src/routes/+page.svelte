@@ -34,32 +34,8 @@
   let filteredBusApiStops = [];
   let filteredTrainApiStations = [];
   let apiResponses = [];
-  let debugWrangledTransitArrivals = [];
-  let debugTransitStops = [];
-
-  function debugArrivalSnapshot(arrivals) {
-    return arrivals.map((arrival) => arrival.toPrediction());
-  }
-
-  function debugTransitStopSnapshot(stops, { walkSpeedMph = WALK_SPEED_MPH } = {}) {
-    return stops.map((stop) => {
-      const transitStop =
-        stop instanceof TransitStopModel ? stop : TransitStopModel.fromStopData(stop);
-      const distance = transitStop.distanceFromUser({ walkSpeedMph });
-      const grouped = transitStop.groupArrivals({ walkSpeedMph });
-
-      return {
-        stopId: transitStop.stopId,
-        name: transitStop.name,
-        type: transitStop.type,
-        distanceMiles: transitStop.distanceMiles,
-        distance,
-        arrivalCount: transitStop.arrivals.length,
-        arrivals: transitStop.arrivals.map((arrival) => arrival.toPrediction()),
-        groupedArrivals: grouped
-      };
-    });
-  }
+  let wrangledArrivals = [];
+  let transitStops = [];
 
   async function ensureLeaflet() {
     if (L) {
@@ -133,11 +109,9 @@
     filteredBusApiStops = [];
     filteredTrainApiStations = [];
     apiResponses = [];
+    wrangledArrivals = [];
+    transitStops = [];
     nearbyStops = [];
-    if (IS_DEV) {
-      debugWrangledTransitArrivals = [];
-      debugTransitStops = [];
-    }
 
     try {
       loadingMessage = 'Requesting your location...';
@@ -194,12 +168,9 @@
       const enrichedBusStops = buildBusStopsFromArrivals(filteredBusApiStops, busData.arrivals);
       const wrangledStops = [...enrichedTrainStops, ...enrichedBusStops];
       if (IS_DEV) {
-        const transitStops = wrangledStops.map((stop) => TransitStopModel.fromStopData(stop));
-        const wrangledArrivals = transitStops.flatMap((stop) => stop.arrivals);
-        debugWrangledTransitArrivals = debugArrivalSnapshot(wrangledArrivals);
-        debugTransitStops = debugTransitStopSnapshot(transitStops, {
-          walkSpeedMph: WALK_SPEED_MPH
-        });
+        const stopModels = wrangledStops.map((stop) => TransitStopModel.fromStopData(stop));
+        transitStops = stopModels;
+        wrangledArrivals = stopModels.flatMap((stop) => stop.arrivals);
       }
 
       nearbyStops = wrangledStops.sort(
@@ -331,8 +302,8 @@
       {filteredTrainApiStations}
       searchRadiusMiles={SEARCH_RADIUS_MILES}
       {apiResponses}
-      wrangledTransitArrivals={debugWrangledTransitArrivals}
-      transitStops={debugTransitStops}
+      {wrangledArrivals}
+      {transitStops}
     />
   {/if}
 </main>

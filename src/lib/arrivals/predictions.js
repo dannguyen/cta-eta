@@ -1,8 +1,8 @@
 import { chunk } from "$lib/cta";
 import { TransitArrival } from "$lib/arrivals/TransitArrival";
 
-function predictionTimestamp(prediction) {
-  const arrivalTime = prediction?.arrivalTime ?? prediction?.arrival;
+function predictionTimestamp(arrival) {
+  const arrivalTime = arrival?.arrivalTime;
   if (
     arrivalTime instanceof Date &&
     !Number.isNaN(arrivalTime.getTime())
@@ -10,8 +10,12 @@ function predictionTimestamp(prediction) {
     return arrivalTime.getTime();
   }
 
-  if (Number.isFinite(prediction.minutes)) {
-    return Date.now() + prediction.minutes * 60000;
+  const etaMinutes =
+    typeof arrival?.getEtaMinutes === "function"
+      ? arrival.getEtaMinutes()
+      : null;
+  if (Number.isFinite(etaMinutes)) {
+    return Date.now() + etaMinutes * 60000;
   }
 
   return Number.MAX_SAFE_INTEGER;
@@ -27,6 +31,31 @@ function defaultBaseOrigin() {
 
 function endpointUrl(endpoint, baseOrigin) {
   return new URL(endpoint, baseOrigin).toString();
+}
+
+function normalizeTrainArrival(arrival, chosenStationId, stationById) {
+  const station = stationById.get(chosenStationId);
+  const normalizedStopId = Number.parseInt(chosenStationId, 10);
+
+  return new TransitArrival({
+    type: arrival.type,
+    stationId: arrival.stationId ?? normalizedStopId,
+    stopId: arrival.stopId ?? normalizedStopId,
+    route: arrival.route,
+    direction: arrival.direction,
+    arrivalTime: arrival.arrivalTime,
+    predictionTime: arrival.predictionTime,
+    vId: arrival.vId,
+    isDelayed: arrival.isDelayed,
+    stopName: arrival.stopName ?? station?.displayName ?? "",
+    stopLatitude: arrival.stopLatitude ?? station?.latitude ?? null,
+    stopLongitude: arrival.stopLongitude ?? station?.longitude ?? null,
+    latitude: arrival.latitude,
+    longitude: arrival.longitude,
+    heading: arrival.heading,
+    destination: arrival.destination,
+    etaMinutes: arrival.getEtaMinutes(),
+  });
 }
 
 export async function fetchTrainPredictions(
@@ -79,7 +108,7 @@ export async function fetchTrainPredictions(
             fallbackStopName: stop.stationName ?? stop.displayName,
             stopLatitude: stop.latitude,
             stopLongitude: stop.longitude,
-          }).toPrediction(),
+          }),
         );
       } catch {
         if (typeof onApiResponse === "function") {
@@ -98,19 +127,21 @@ export async function fetchTrainPredictions(
   const allPredictions = perStationPredictions.flat();
   const predictionsByRouteDestination = new Map();
 
-  for (const prediction of allPredictions) {
-    const key = `${prediction.route}|${prediction.destination}`;
+  for (const arrival of allPredictions) {
+    const key = `${arrival.route}|${arrival.destination}`;
     const group = predictionsByRouteDestination.get(key) ?? [];
-    group.push(prediction);
+    group.push(arrival);
     predictionsByRouteDestination.set(key, group);
   }
 
-  const results = new Map(stops.map((stop) => [String(stop.stopId), []]));
+  const results = new Map(
+    stops.map((stop) => [String(stop.stationId ?? stop.stopId), []]),
+  );
   const selectedStopIds = new Set();
 
   for (const group of predictionsByRouteDestination.values()) {
     const stationIds = [
-      ...new Set(group.map((prediction) => String(prediction.stationId ?? prediction.stopId))),
+      ...new Set(group.map((arrival) => String(arrival.stationId ?? arrival.stopId))),
     ].filter((stationId) => distanceByStationId.has(stationId));
 
     stationIds.sort(
@@ -126,8 +157,8 @@ export async function fetchTrainPredictions(
 
     const topTwo = group
       .filter(
-        (prediction) =>
-          String(prediction.stationId ?? prediction.stopId) === chosenStationId,
+        (arrival) =>
+          String(arrival.stationId ?? arrival.stopId) === chosenStationId,
       )
       .sort((a, b) => predictionTimestamp(a) - predictionTimestamp(b))
       .slice(0, 2);
@@ -139,18 +170,9 @@ export async function fetchTrainPredictions(
     selectedStopIds.add(chosenStationId);
     const stationPredictions = results.get(chosenStationId) ?? [];
     stationPredictions.push(
-      ...topTwo.map((prediction) => ({
-        ...prediction,
-        stationId: prediction.stationId ?? Number.parseInt(chosenStationId, 10),
-        stopLatitude:
-          prediction.stopLatitude ??
-          stationById.get(chosenStationId)?.latitude ??
-          null,
-        stopLongitude:
-          prediction.stopLongitude ??
-          stationById.get(chosenStationId)?.longitude ??
-          null,
-      })),
+      ...topTwo.map((arrival) =>
+        normalizeTrainArrival(arrival, chosenStationId, stationById),
+      ),
     );
     results.set(chosenStationId, stationPredictions);
   }
@@ -160,9 +182,7 @@ export async function fetchTrainPredictions(
     results.set(stationId, predictions);
   }
 
-  const arrivals = [...results.values()]
-    .flat()
-    .map((prediction) => TransitArrival.fromPrediction(prediction));
+  const arrivals = [...results.values()].flat();
 
   return {
     arrivals,
@@ -217,7 +237,7 @@ export async function fetchBusPredictions(
           TransitArrival.fromBusPrediction(prediction, {
             stopLatitude: stop?.latitude ?? null,
             stopLongitude: stop?.longitude ?? null,
-          }).toPrediction(),
+          }),
         );
       }
     } catch {
@@ -234,17 +254,17 @@ export async function fetchBusPredictions(
   }
 
   const predictionsByRouteDirection = new Map();
-  for (const prediction of allPredictions) {
-    const key = `${prediction.route}|${prediction.direction}`;
+  for (const arrival of allPredictions) {
+    const key = `${arrival.route}|${arrival.direction}`;
     const group = predictionsByRouteDirection.get(key) ?? [];
-    group.push(prediction);
+    group.push(arrival);
     predictionsByRouteDirection.set(key, group);
   }
 
   const selectedStopIds = new Set();
   for (const group of predictionsByRouteDirection.values()) {
     const closestStops = [
-      ...new Set(group.map((prediction) => String(prediction.stopId))),
+      ...new Set(group.map((arrival) => String(arrival.stopId))),
     ]
       .filter((stopId) => distanceByStopId.has(stopId))
       .sort(
@@ -256,7 +276,7 @@ export async function fetchBusPredictions(
 
     for (const stopId of closestStops) {
       const topTwo = group
-        .filter((prediction) => String(prediction.stopId) === stopId)
+        .filter((arrival) => String(arrival.stopId) === stopId)
         .sort((a, b) => predictionTimestamp(a) - predictionTimestamp(b))
         .slice(0, 2);
 
@@ -276,9 +296,7 @@ export async function fetchBusPredictions(
     results.set(stopId, predictions);
   }
 
-  const arrivals = [...results.values()]
-    .flat()
-    .map((prediction) => TransitArrival.fromPrediction(prediction));
+  const arrivals = [...results.values()].flat();
 
   return {
     arrivals,

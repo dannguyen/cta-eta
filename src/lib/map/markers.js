@@ -7,8 +7,8 @@ import {
   walkingMinutesFromMiles,
 } from "$lib/arrivals/formatting";
 
-function predictionSortTime(prediction) {
-  return prediction.arrival?.getTime?.() ?? Number.MAX_SAFE_INTEGER;
+function predictionSortTime(arrival) {
+  return arrival?.arrivalTime?.getTime?.() ?? Number.MAX_SAFE_INTEGER;
 }
 
 export function markerBackground(stop) {
@@ -91,20 +91,26 @@ export function popupHtml(stop, { walkSpeedMph = 2 } = {}) {
 
   const predictionMarkup = predictions.length
     ? predictions
-        .map(
-          (prediction) => `
+      .map(
+          (arrival) => {
+            const etaMinutes =
+              typeof arrival.getEtaMinutes === "function"
+                ? arrival.getEtaMinutes()
+                : null;
+            return `
             <li>
-              <strong>${escapeHtml(prediction.route)}</strong>
+              <strong>${escapeHtml(arrival.route)}</strong>
               ${escapeHtml(
-                prediction.mode === "bus"
-                  ? busDirectionOnly(prediction)
-                  : destinationOrDirection(prediction),
+                arrival.type === "bus"
+                  ? busDirectionOnly(arrival)
+                  : destinationOrDirection(arrival),
               )}
-              <span class="${etaTimingClass(prediction.minutes, walkMinutes)}">${escapeHtml(
-                formatMinutes(prediction.minutes),
-              )} (${escapeHtml(formatClock(prediction.arrival))})</span>
+              <span class="${etaTimingClass(etaMinutes, walkMinutes)}">${escapeHtml(
+                formatMinutes(etaMinutes),
+              )} (${escapeHtml(formatClock(arrival.arrivalTime))})</span>
             </li>
-          `,
+          `;
+          },
         )
         .join("")
     : "<li>No live predictions at this time.</li>";

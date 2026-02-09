@@ -1,12 +1,12 @@
 import { TransitStop } from "$lib/arrivals/TransitStop";
 
-function predictionSortTime(prediction) {
-  const arrivalTime = prediction?.arrivalTime ?? prediction?.arrival;
+function predictionSortTime(arrival) {
+  const arrivalTime = arrival?.arrivalTime;
   return arrivalTime?.getTime?.() ?? Number.MAX_SAFE_INTEGER;
 }
 
-function predictionArrivalTime(prediction) {
-  const arrivalTime = prediction?.arrivalTime ?? prediction?.arrival;
+function predictionArrivalTime(arrival) {
+  const arrivalTime = arrival?.arrivalTime;
   if (arrivalTime instanceof Date && !Number.isNaN(arrivalTime.getTime())) {
     return arrivalTime.getTime();
   }
@@ -39,9 +39,9 @@ export function groupBusStopsByName(candidateBusStops, busData) {
     }
 
     const predictions = busData.predictionsByStop.get(String(stopId)) ?? [];
-    for (const prediction of predictions) {
+    for (const arrival of predictions) {
       const stopName =
-        String(prediction.stopName || stop.displayName || "").trim() ||
+        String(arrival.stopName || stop.displayName || "").trim() ||
         stop.displayName;
       const key = stopName.toUpperCase();
 
@@ -59,17 +59,13 @@ export function groupBusStopsByName(candidateBusStops, busData) {
 
       group.members.set(String(stop.stopId), stop);
 
-      const route = String(prediction.route || "Bus").trim() || "Bus";
+      const route = String(arrival.route || "Bus").trim() || "Bus";
       const direction =
-        String(prediction.direction || "Inbound").trim() || "Inbound";
+        String(arrival.direction || "Inbound").trim() || "Inbound";
       const routeKey = `${route}|${direction}`;
 
       const directionPredictions = group.routeDirections.get(routeKey) ?? [];
-      directionPredictions.push({
-        ...prediction,
-        route,
-        direction,
-      });
+      directionPredictions.push(arrival);
       group.routeDirections.set(routeKey, directionPredictions);
     }
   }
@@ -128,7 +124,6 @@ export function buildTrainStopsFromArrivals(candidateTrainStations, arrivals) {
     .map(([stationId, stationArrivals]) => {
       const station = stationById.get(stationId);
       const predictions = stationArrivals
-        .map((arrival) => arrival.toPrediction())
         .sort((a, b) => predictionArrivalTime(a) - predictionArrivalTime(b));
 
       return {
@@ -206,7 +201,6 @@ export function buildBusStopsFromArrivals(candidateBusStops, arrivals) {
           [...directionArrivals]
             .sort((a, b) => predictionArrivalTime(a) - predictionArrivalTime(b))
             .slice(0, 2)
-            .map((arrival) => arrival.toPrediction()),
         )
         .sort((a, b) => predictionArrivalTime(a) - predictionArrivalTime(b));
 
