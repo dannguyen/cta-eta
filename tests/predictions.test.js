@@ -84,9 +84,9 @@ describe("fetchTrainPredictions", () => {
         prediction.route === "Red" && prediction.destination === "Howard",
     );
     expect(redHoward).toHaveLength(2);
-    expect(redHoward.every((prediction) => prediction.stopId === "30170")).toBe(
-      true,
-    );
+    expect(
+      redHoward.every((prediction) => String(prediction.stopId) === "30170"),
+    ).toBe(true);
 
     const station30200 = result.predictionsByStop.get("30200");
     expect(station30200.some((prediction) => prediction.route === "Blue")).toBe(
@@ -98,16 +98,16 @@ describe("fetchTrainPredictions", () => {
 describe("fetchBusPredictions", () => {
   it("selects two closest stops per route+direction and keeps up to two ETAs per stop", async () => {
     const stops = [
-      { stopId: "A", distanceMiles: 0.1 },
-      { stopId: "B", distanceMiles: 0.2 },
-      { stopId: "C", distanceMiles: 0.3 },
+      { stopId: "5001", distanceMiles: 0.1 },
+      { stopId: "5002", distanceMiles: 0.2 },
+      { stopId: "5003", distanceMiles: 0.3 },
     ];
 
     const payload = {
       "bustime-response": {
         prd: [
           {
-            stpid: "A",
+            stpid: "5001",
             stpnm: "Stop A",
             rt: "147",
             rtdir: "Northbound",
@@ -116,7 +116,7 @@ describe("fetchBusPredictions", () => {
             prdctdn: "5",
           },
           {
-            stpid: "A",
+            stpid: "5001",
             stpnm: "Stop A",
             rt: "147",
             rtdir: "Northbound",
@@ -125,7 +125,7 @@ describe("fetchBusPredictions", () => {
             prdctdn: "12",
           },
           {
-            stpid: "B",
+            stpid: "5002",
             stpnm: "Stop B",
             rt: "147",
             rtdir: "Northbound",
@@ -134,7 +134,7 @@ describe("fetchBusPredictions", () => {
             prdctdn: "3",
           },
           {
-            stpid: "B",
+            stpid: "5002",
             stpnm: "Stop B",
             rt: "147",
             rtdir: "Southbound",
@@ -143,7 +143,7 @@ describe("fetchBusPredictions", () => {
             prdctdn: "7",
           },
           {
-            stpid: "C",
+            stpid: "5003",
             stpnm: "Stop C",
             rt: "147",
             rtdir: "Southbound",
@@ -152,7 +152,7 @@ describe("fetchBusPredictions", () => {
             prdctdn: "4",
           },
           {
-            stpid: "C",
+            stpid: "5003",
             stpnm: "Stop C",
             rt: "36",
             rtdir: "Northbound",
@@ -172,9 +172,9 @@ describe("fetchBusPredictions", () => {
       baseOrigin: "https://example.test",
     });
 
-    expect([...result.selectedStopIds].sort()).toEqual(["A", "B", "C"]);
-    expect(result.predictionsByStop.get("A")).toHaveLength(2);
-    expect(result.predictionsByStop.get("B")).toHaveLength(2);
-    expect(result.predictionsByStop.get("C")).toHaveLength(2);
+    expect([...result.selectedStopIds].sort()).toEqual(["5001", "5002", "5003"]);
+    expect(result.predictionsByStop.get("5001")).toHaveLength(2);
+    expect(result.predictionsByStop.get("5002")).toHaveLength(2);
+    expect(result.predictionsByStop.get("5003")).toHaveLength(2);
   });
 });

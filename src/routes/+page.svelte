@@ -3,7 +3,7 @@
   import { base } from '$app/paths';
   import 'leaflet/dist/leaflet.css';
   import { TRAIN_LINE_META, parseBusStops, parseTrainStations, withinRadius } from '$lib/cta';
-  import { fetchText } from '$lib/http';
+  import { apiEndpoint, fetchText, withBasePath } from '$lib/api';
   import { getUserLocation } from '$lib/location';
   import { fetchBusPredictions, fetchTrainPredictions } from '$lib/arrivals/predictions';
   import { buildUpcomingStops, groupBusStopsByName } from '$lib/arrivals/grouping';
@@ -12,7 +12,6 @@
 
   const SEARCH_RADIUS_MILES = 1;
   const WALK_SPEED_MPH = 2;
-  const CTA_PROXY_BASE = String(import.meta.env.VITE_CTA_PROXY_BASE ?? '').trim();
 
   let loading = false;
   let loadingMessage = '';
@@ -27,23 +26,6 @@
   let L;
 
   let loadNonce = 0;
-
-  function withBasePath(path) {
-    const normalizedPath = String(path).replace(/^\/+/, '');
-    const normalizedBase = base ? (base.endsWith('/') ? base.slice(0, -1) : base) : '';
-    return `${normalizedBase}/${normalizedPath}`;
-  }
-
-  function apiEndpoint(path) {
-    const normalizedPath = String(path).replace(/^\/+/, '');
-    if (CTA_PROXY_BASE) {
-      const normalizedProxyBase = CTA_PROXY_BASE.endsWith('/')
-        ? CTA_PROXY_BASE
-        : `${CTA_PROXY_BASE}/`;
-      return new URL(normalizedPath, normalizedProxyBase).toString();
-    }
-    return `/${normalizedPath}`;
-  }
 
   async function ensureLeaflet() {
     if (L) {
@@ -123,8 +105,8 @@
 
       loadingMessage = 'Loading CTA stop datasets...';
       const [trainCsv, busCsv] = await Promise.all([
-        fetchText(withBasePath('data/cta-train-stations.csv')),
-        fetchText(withBasePath('data/cta-bus-stops.csv'))
+        fetchText(withBasePath('data/cta-train-stations.csv', base)),
+        fetchText(withBasePath('data/cta-bus-stops.csv', base))
       ]);
       if (currentNonce !== loadNonce) {
         return;

@@ -1,10 +1,5 @@
-import {
-  chunk,
-  minutesUntil,
-  parseBusApiDate,
-  parseTrainApiDate,
-  trainDisplayFromRoute,
-} from "$lib/cta";
+import { chunk } from "$lib/cta";
+import { TransitArrival } from "$lib/arrivals/TransitArrival";
 
 function predictionTimestamp(prediction) {
   if (
@@ -64,21 +59,12 @@ export async function fetchTrainPredictions(
         const rawEta = payload?.ctatt?.eta;
         const etaList = Array.isArray(rawEta) ? rawEta : rawEta ? [rawEta] : [];
 
-        return etaList.map((eta) => {
-          const arrival = parseTrainApiDate(eta.arrT);
-          const displayRoute = trainDisplayFromRoute(eta.rt);
-          const destination = eta.destNm || "Unknown destination";
-
-          return {
-            mode: "train",
-            stopId: String(eta.staId || stop.stationId || stop.stopId),
-            route: displayRoute.name || "Train",
-            direction: destination,
-            destination,
-            arrival,
-            minutes: minutesUntil(arrival),
-          };
-        });
+        return etaList.map((eta) =>
+          TransitArrival.fromTrainEta(eta, {
+            fallbackStopId: stop.stationId ?? stop.stopId,
+            fallbackStopName: stop.stationName ?? stop.displayName,
+          }).toPrediction(),
+        );
       } catch {
         return [];
       }
@@ -100,7 +86,7 @@ export async function fetchTrainPredictions(
 
   for (const group of predictionsByRouteDestination.values()) {
     const stationIds = [
-      ...new Set(group.map((prediction) => prediction.stopId)),
+      ...new Set(group.map((prediction) => String(prediction.stopId))),
     ].filter((stationId) => distanceByStationId.has(stationId));
 
     stationIds.sort(
@@ -115,7 +101,7 @@ export async function fetchTrainPredictions(
     }
 
     const topTwo = group
-      .filter((prediction) => prediction.stopId === chosenStationId)
+      .filter((prediction) => String(prediction.stopId) === chosenStationId)
       .sort((a, b) => predictionTimestamp(a) - predictionTimestamp(b))
       .slice(0, 2);
 
@@ -172,26 +158,7 @@ export async function fetchBusPredictions(
           : [];
 
       for (const prediction of predictionList) {
-        const arrival = parseBusApiDate(prediction.prdtm);
-        const fallbackMinutes = minutesUntil(arrival);
-        const countdown = Number(prediction.prdctdn);
-        const minutes = Number.isFinite(countdown)
-          ? Math.max(0, countdown)
-          : prediction.prdctdn === "DUE"
-            ? 0
-            : fallbackMinutes;
-
-        allPredictions.push({
-          mode: "bus",
-          stopId: String(prediction.stpid),
-          stopName: prediction.stpnm || "",
-          stopCategory: "Bus Stop",
-          route: prediction.rt || "Bus",
-          direction: prediction.rtdir || "Inbound",
-          destination: prediction.des || "",
-          arrival,
-          minutes,
-        });
+        allPredictions.push(TransitArrival.fromBusPrediction(prediction).toPrediction());
       }
     } catch {
       // A failed chunk should not block the whole app.
