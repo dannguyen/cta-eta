@@ -6,6 +6,8 @@
   export let filteredTrainApiStations = [];
   export let searchRadiusMiles = 1;
   export let apiResponses = [];
+  export let trainApiUrl = '/api/train';
+  export let busApiUrl = '/api/bus';
   export let wrangledArrivals = [];
   export let transitStops = [];
 
@@ -53,6 +55,8 @@
 
   $: trainApiResponses = apiResponses.filter((entry) => entry.mode === 'train');
   $: busApiResponses = apiResponses.filter((entry) => entry.mode === 'bus');
+  $: trainStops = transitStops.filter((stop) => stop?.type === 'train');
+  $: busStops = transitStops.filter((stop) => stop?.type === 'bus');
 </script>
 
 <section class="debug">
@@ -113,63 +117,95 @@
     {#if apiResponses.length === 0}
       <p class="debug-empty">No API responses captured yet.</p>
     {:else}
-      <details class="debug-subsection" open>
-        <summary>Train Calls ({trainApiResponses.length}, {modeItemCount(trainApiResponses)} eta items)</summary>
+      <details class="debug-subsection debug-call-group" open>
+        <summary>
+          <span class="debug-subheading">
+            Train Calls ({trainApiResponses.length}, {modeItemCount(trainApiResponses)} eta items)
+          </span>
+        </summary>
+        <p class="debug-narrative">We call the endpoint at <code>{trainApiUrl}</code>.</p>
         {#if trainApiResponses.length === 0}
           <p class="debug-empty">No train API calls captured.</p>
         {:else}
-          {#each trainApiResponses as response, index}
-            {@const meta = apiCallMeta(response)}
-            <details class="debug-call">
-              <summary>Call {index + 1} ({apiItemCount(response)} eta items)</summary>
-              <p><strong>URL:</strong> <code>{meta.href}</code></p>
-              <p><strong>Params:</strong></p>
-              <pre>{JSON.stringify(meta.params, null, 2)}</pre>
-              <p><strong>Response:</strong></p>
-              <pre>{JSON.stringify(response.payload, null, 2)}</pre>
-            </details>
-          {/each}
+          <ul class="debug-call-list">
+            {#each trainApiResponses as response, index}
+              {@const meta = apiCallMeta(response)}
+              <li>
+                <details class="debug-call">
+                  <summary>Call {index + 1} ({apiItemCount(response)} eta items)</summary>
+                  <p><strong>URL:</strong> <code>{meta.href}</code></p>
+                  <p><strong>Params:</strong></p>
+                  <pre>{JSON.stringify(meta.params, null, 2)}</pre>
+                  <p><strong>Response:</strong></p>
+                  <pre>{JSON.stringify(response.payload, null, 2)}</pre>
+                </details>
+              </li>
+            {/each}
+          </ul>
         {/if}
       </details>
 
-      <details class="debug-subsection" open>
-        <summary>Bus Calls ({busApiResponses.length}, {modeItemCount(busApiResponses)} prd items)</summary>
+      <details class="debug-subsection debug-call-group" open>
+        <summary>
+          <span class="debug-subheading">
+            Bus Calls ({busApiResponses.length}, {modeItemCount(busApiResponses)} prd items)
+          </span>
+        </summary>
+        <p class="debug-narrative">We call the endpoint at <code>{busApiUrl}</code>.</p>
         {#if busApiResponses.length === 0}
           <p class="debug-empty">No bus API calls captured.</p>
         {:else}
-          {#each busApiResponses as response, index}
-            {@const meta = apiCallMeta(response)}
-            <details class="debug-call">
-              <summary>Call {index + 1} ({apiItemCount(response)} prd items)</summary>
-              <p><strong>URL:</strong> <code>{meta.href}</code></p>
-              <p><strong>Params:</strong></p>
-              <pre>{JSON.stringify(meta.params, null, 2)}</pre>
-              <p><strong>Response:</strong></p>
-              <pre>{JSON.stringify(response.payload, null, 2)}</pre>
-            </details>
-          {/each}
+          <ul class="debug-call-list">
+            {#each busApiResponses as response, index}
+              {@const meta = apiCallMeta(response)}
+              <li>
+                <details class="debug-call">
+                  <summary>Call {index + 1} ({apiItemCount(response)} prd items)</summary>
+                  <p><strong>URL:</strong> <code>{meta.href}</code></p>
+                  <p><strong>Params:</strong></p>
+                  <pre>{JSON.stringify(meta.params, null, 2)}</pre>
+                  <p><strong>Response:</strong></p>
+                  <pre>{JSON.stringify(response.payload, null, 2)}</pre>
+                </details>
+              </li>
+            {/each}
+          </ul>
         {/if}
       </details>
+    {/if}
+  </details>
+
+  <details>
+    <summary>TrainStop Objects ({trainStops.length})</summary>
+    {#if trainStops.length === 0}
+      <p class="debug-empty">No TrainStop objects available.</p>
+    {:else}
+      {#each trainStops as stop, index}
+        <div class="debug-stop-object">
+          <h3>{stop?.name || `Train Stop ${index + 1}`} - train stop</h3>
+          <pre>{JSON.stringify(stop, null, 2)}</pre>
+        </div>
+      {/each}
+    {/if}
+  </details>
+
+  <details>
+    <summary>BusStop Objects ({busStops.length})</summary>
+    {#if busStops.length === 0}
+      <p class="debug-empty">No BusStop objects available.</p>
+    {:else}
+      {#each busStops as stop, index}
+        <div class="debug-stop-object">
+          <h3>{stop?.name || `Bus Stop ${index + 1}`} - bus stop</h3>
+          <pre>{JSON.stringify(stop, null, 2)}</pre>
+        </div>
+      {/each}
     {/if}
   </details>
 
   <details>
     <summary>Wrangled TransitArrival List ({wrangledArrivals.length})</summary>
     <pre>{JSON.stringify(wrangledArrivals, null, 2)}</pre>
-  </details>
-
-  <details>
-    <summary>TransitStop Objects ({transitStops.length})</summary>
-    {#if transitStops.length === 0}
-      <p class="debug-empty">No TransitStop objects available.</p>
-    {:else}
-      {#each transitStops as stop, index}
-        <div class="debug-stop-object">
-          <h3>{stop?.name || `Stop ${index + 1}`} - {stop?.type || 'unknown'} stop</h3>
-          <pre>{JSON.stringify(stop, null, 2)}</pre>
-        </div>
-      {/each}
-    {/if}
   </details>
 </section>
 
@@ -250,6 +286,27 @@
     color: #475569;
   }
 
+  .debug-call-group > summary {
+    padding-left: 8px;
+    list-style: none;
+    font-family: 'Avenir Next', 'Segoe UI', sans-serif;
+    font-size: 0.9rem;
+  }
+
+  .debug-call-group > summary::before {
+    content: none;
+  }
+
+  .debug-call-group > summary::-webkit-details-marker {
+    display: none;
+  }
+
+  .debug-subheading {
+    font-size: 0.96rem;
+    font-weight: 700;
+    color: #0f172a;
+  }
+
   .debug-subsection p {
     margin: 0 0 6px;
     font-size: 0.82rem;
@@ -265,6 +322,22 @@
     margin-top: 10px;
     padding-top: 10px;
     border-top: 1px dotted #e2e8f0;
+  }
+
+  .debug-call-list {
+    margin: 8px 0 0 18px;
+    padding: 0;
+    list-style: none;
+  }
+
+  .debug-call-list li {
+    margin: 6px 0;
+  }
+
+  .debug-call-group {
+    margin-left: 12px;
+    padding-left: 6px;
+    border-left: 2px solid #e2e8f0;
   }
 
   .debug-stop-object h3 {

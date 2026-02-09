@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { TransitArrival } from '$lib/arrivals/TransitArrival';
+import { BusArrival, TrainArrival, TransitArrival } from '$lib/arrivals/TransitArrival';
 
 describe('TransitArrival.fromBusPrediction', () => {
   it('maps bus API fields to the shared interface', () => {
@@ -37,6 +37,8 @@ describe('TransitArrival.fromBusPrediction', () => {
     expect(arrival.latitude).toBeNull();
     expect(arrival.longitude).toBeNull();
     expect(arrival.heading).toBeNull();
+    expect(arrival).toBeInstanceOf(BusArrival);
+    expect(arrival).toBeInstanceOf(TransitArrival);
     expect(arrival.getEtaMinutes()).toBe(5);
     expect(arrival.type).toBe('bus');
     expect(arrival.stopLatitude).toBeCloseTo(41.991, 6);
@@ -83,6 +85,8 @@ describe('TransitArrival.fromTrainEta', () => {
     expect(arrival.latitude).toBeCloseTo(41.888, 6);
     expect(arrival.longitude).toBeCloseTo(-87.633, 6);
     expect(arrival.heading).toBe(270);
+    expect(arrival).toBeInstanceOf(TrainArrival);
+    expect(arrival).toBeInstanceOf(TransitArrival);
     expect(arrival.getEtaMinutes()).toBeGreaterThanOrEqual(0);
     expect(arrival.type).toBe('train');
     expect(arrival.destination).toBe('Kimball');

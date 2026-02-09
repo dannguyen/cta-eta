@@ -5,10 +5,60 @@ import {
   buildUpcomingStops,
   groupBusStopsByName,
 } from "$lib/arrivals/grouping";
-import { TransitArrival } from "$lib/arrivals/TransitArrival";
+import { BusArrival, TrainArrival } from "$lib/arrivals/TransitArrival";
 
 function makeArrival(minutesFromNow) {
   return new Date(Date.now() + minutesFromNow * 60_000);
+}
+
+function makeBusArrival({
+  stopId,
+  route,
+  direction,
+  stopName = "Stop",
+  stopLatitude = null,
+  stopLongitude = null,
+  destination = "",
+  minutes = 0,
+}) {
+  return new BusArrival({
+    stopId,
+    route,
+    direction,
+    arrivalTime: makeArrival(minutes),
+    predictionTime: new Date(),
+    vId: "bus-1",
+    isDelayed: false,
+    stopName,
+    stopLatitude,
+    stopLongitude,
+    destination,
+    etaMinutes: minutes,
+  });
+}
+
+function makeTrainArrival({
+  stationId,
+  stopId,
+  route,
+  direction,
+  stopName = "Station",
+  destination = "",
+  minutes = 0,
+}) {
+  return new TrainArrival({
+    stationId,
+    stopId,
+    route,
+    direction,
+    arrivalTime: makeArrival(minutes),
+    predictionTime: new Date(),
+    vId: "train-1",
+    isDelayed: false,
+    stopName,
+    destination,
+    etaMinutes: minutes,
+  });
 }
 
 describe("groupBusStopsByName", () => {
@@ -34,27 +84,25 @@ describe("groupBusStopsByName", () => {
       [
         "1001",
         [
-          {
-            stopId: "1001",
+          makeBusArrival({
+            stopId: 1001,
             stopName: "Sheridan & Winthrop",
             route: "147",
             direction: "Northbound",
-            arrival: makeArrival(4),
             minutes: 4,
-          },
+          }),
         ],
       ],
       [
         "1002",
         [
-          {
-            stopId: "1002",
+          makeBusArrival({
+            stopId: 1002,
             stopName: "Sheridan & Winthrop",
             route: "147",
             direction: "Southbound",
-            arrival: makeArrival(6),
             minutes: 6,
-          },
+          }),
         ],
       ],
     ]);
@@ -88,24 +136,22 @@ describe("build stops from TransitArrival instances", () => {
     ];
 
     const arrivals = [
-      TransitArrival.fromPrediction({
-        type: "train",
+      makeTrainArrival({
         stationId: 30170,
         stopId: 30170,
         route: "Red",
         direction: "Howard",
         stopName: "Thorndale",
-        arrival: makeArrival(4),
+        destination: "Howard",
         minutes: 4,
       }),
-      TransitArrival.fromPrediction({
-        type: "train",
+      makeTrainArrival({
         stationId: 30170,
         stopId: 30170,
         route: "Red",
         direction: "95th/Dan Ryan",
         stopName: "Thorndale",
-        arrival: makeArrival(7),
+        destination: "95th/Dan Ryan",
         minutes: 7,
       }),
     ];
@@ -135,26 +181,24 @@ describe("build stops from TransitArrival instances", () => {
     ];
 
     const arrivals = [
-      TransitArrival.fromPrediction({
-        type: "bus",
+      makeBusArrival({
         stopId: 1001,
         route: "147",
         direction: "Northbound",
         stopName: "Sheridan & Winthrop",
         stopLatitude: 41.98,
         stopLongitude: -87.66,
-        arrival: makeArrival(4),
+        destination: "Howard",
         minutes: 4,
       }),
-      TransitArrival.fromPrediction({
-        type: "bus",
+      makeBusArrival({
         stopId: 1002,
         route: "147",
         direction: "Southbound",
         stopName: "Sheridan & Winthrop",
         stopLatitude: 41.9804,
         stopLongitude: -87.6596,
-        arrival: makeArrival(6),
+        destination: "Downtown",
         minutes: 6,
       }),
     ];
@@ -176,27 +220,30 @@ describe("buildUpcomingStops", () => {
         displayName: "Thorndale",
         distanceMiles: 0.29,
         predictions: [
-          {
+          makeTrainArrival({
+            stationId: 30170,
+            stopId: 30170,
             route: "Red",
             direction: "Howard",
             destination: "Howard",
-            arrival: makeArrival(3),
             minutes: 3,
-          },
-          {
+          }),
+          makeTrainArrival({
+            stationId: 30170,
+            stopId: 30170,
             route: "Red",
             direction: "Howard",
             destination: "Howard",
-            arrival: makeArrival(9),
             minutes: 9,
-          },
-          {
+          }),
+          makeTrainArrival({
+            stationId: 30170,
+            stopId: 30170,
             route: "Red",
             direction: "95th/Dan Ryan",
             destination: "95th/Dan Ryan",
-            arrival: makeArrival(6),
             minutes: 6,
-          },
+          }),
         ],
       },
     ];
@@ -222,27 +269,30 @@ describe("buildUpcomingStops", () => {
         displayName: "Sheridan & Winthrop",
         distanceMiles: 0.21,
         predictions: [
-          {
+          makeBusArrival({
+            stopId: 1001,
             route: "147",
             direction: "Northbound",
             destination: "Howard",
-            arrival: makeArrival(5),
+            stopName: "Sheridan & Winthrop",
             minutes: 5,
-          },
-          {
+          }),
+          makeBusArrival({
+            stopId: 1001,
             route: "147",
             direction: "Northbound",
             destination: "Howard",
-            arrival: makeArrival(13),
+            stopName: "Sheridan & Winthrop",
             minutes: 13,
-          },
-          {
+          }),
+          makeBusArrival({
+            stopId: 1002,
             route: "146",
             direction: "Southbound",
             destination: "Downtown",
-            arrival: makeArrival(8),
+            stopName: "Sheridan & Winthrop",
             minutes: 8,
-          },
+          }),
         ],
       },
     ];

@@ -90,9 +90,7 @@ export class TransitArrival {
         ? 0
         : fallbackMinutes;
 
-    return new TransitArrival({
-      type: 'bus',
-      stationId: null,
+    return new BusArrival({
       stopId: parseStopId(prediction.stpid),
       route: normalizedString(prediction.rt, 'Bus'),
       direction: normalizedString(prediction.rtdir, 'Inbound'),
@@ -122,8 +120,7 @@ export class TransitArrival {
     const destination = normalizedString(eta.destNm, 'Unknown destination');
     const stationId = parseStationId(eta.staId ?? fallbackStationId ?? fallbackStopId);
 
-    return new TransitArrival({
-      type: 'train',
+    return new TrainArrival({
       stationId,
       stopId: parseStopId(eta.staId ?? fallbackStopId),
       route: normalizedString(displayRoute.name, 'Train'),
@@ -142,37 +139,26 @@ export class TransitArrival {
     });
   }
 
-  static fromPrediction(prediction = {}) {
-    const type = normalizedString(prediction.type ?? prediction.mode, 'bus');
-    const arrivalTime = prediction.arrivalTime ?? prediction.arrival ?? null;
-    const predictionTime = prediction.predictionTime ?? null;
-
-    return new TransitArrival({
-      type,
-      stationId: parseStationId(prediction.stationId),
-      stopId: parseStopId(prediction.stopId),
-      route: normalizedString(prediction.route, type === 'train' ? 'Train' : 'Bus'),
-      direction: normalizedString(prediction.direction, type === 'train' ? 'Unknown destination' : 'Inbound'),
-      arrivalTime: arrivalTime instanceof Date ? arrivalTime : parseTrainApiDate(arrivalTime),
-      predictionTime: predictionTime instanceof Date ? predictionTime : parseTrainApiDate(predictionTime),
-      vId: normalizedString(prediction.vId) || null,
-      isDelayed: parseDelayFlag(prediction.isDelayed),
-      stopName: normalizedString(prediction.stopName),
-      stopLatitude: parseOptionalNumber(prediction.stopLatitude),
-      stopLongitude: parseOptionalNumber(prediction.stopLongitude),
-      latitude: parseOptionalNumber(prediction.latitude),
-      longitude: parseOptionalNumber(prediction.longitude),
-      heading: parseOptionalNumber(prediction.heading),
-      destination: normalizedString(prediction.destination, normalizedString(prediction.direction)),
-      etaMinutes: Number.isFinite(prediction.minutes)
-        ? prediction.minutes
-        : Number.isFinite(prediction.etaMinutes)
-          ? prediction.etaMinutes
-          : null
-    });
-  }
-
   getEtaMinutes() {
     return Number.isFinite(this.etaMinutes) ? this.etaMinutes : minutesUntil(this.arrivalTime);
+  }
+}
+
+export class BusArrival extends TransitArrival {
+  constructor(payload) {
+    super({
+      ...payload,
+      type: 'bus',
+      stationId: null
+    });
+  }
+}
+
+export class TrainArrival extends TransitArrival {
+  constructor(payload) {
+    super({
+      ...payload,
+      type: 'train'
+    });
   }
 }

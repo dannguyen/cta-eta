@@ -1,12 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { TransitArrival } from '$lib/arrivals/TransitArrival';
-import { TransitStop } from '$lib/arrivals/TransitStop';
+import { BusArrival, TrainArrival } from '$lib/arrivals/TransitArrival';
+import { BusStop, TrainStop } from '$lib/arrivals/TransitStop';
 
 function makeArrival(route, direction, minutesFromNow, type = 'bus') {
   const now = new Date();
   const arrivalTime = new Date(now.getTime() + minutesFromNow * 60_000);
-  return new TransitArrival({
-    type,
+  const payload = {
     stopId: 12345,
     route,
     direction,
@@ -16,12 +15,16 @@ function makeArrival(route, direction, minutesFromNow, type = 'bus') {
     isDelayed: false,
     stopName: 'Test Stop',
     etaMinutes: minutesFromNow
-  });
+  };
+
+  return type === 'train'
+    ? new TrainArrival({ ...payload, stationId: 12345 })
+    : new BusArrival(payload);
 }
 
 describe('TransitStop distanceFromUser', () => {
   it('returns distance in feet and walking minutes', () => {
-    const stop = new TransitStop({
+    const stop = new BusStop({
       stopId: 'bus:sample',
       name: 'Sheridan & Winthrop',
       type: 'bus',
@@ -37,7 +40,7 @@ describe('TransitStop distanceFromUser', () => {
 
 describe('TransitStop grouping', () => {
   it('groups bus arrivals by direction then route', () => {
-    const stop = new TransitStop({
+    const stop = new BusStop({
       stopId: 'bus:sample',
       name: 'Sheridan & Winthrop',
       type: 'bus',
@@ -63,7 +66,7 @@ describe('TransitStop grouping', () => {
   });
 
   it('groups train arrivals by route then direction', () => {
-    const stop = new TransitStop({
+    const stop = new TrainStop({
       stopId: 'train:sample',
       name: 'Thorndale',
       type: 'train',

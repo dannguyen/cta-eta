@@ -14,6 +14,8 @@
 
   const SEARCH_RADIUS_MILES = 1;
   const WALK_SPEED_MPH = 2;
+  const TRAIN_API_URL = apiEndpoint('api/train');
+  const BUS_API_URL = apiEndpoint('api/bus');
 
   let loading = false;
   let loadingMessage = '';
@@ -302,6 +304,8 @@
       {filteredTrainApiStations}
       searchRadiusMiles={SEARCH_RADIUS_MILES}
       {apiResponses}
+      trainApiUrl={TRAIN_API_URL}
+      busApiUrl={BUS_API_URL}
       {wrangledArrivals}
       {transitStops}
     />

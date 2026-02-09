@@ -1,5 +1,5 @@
 import { chunk } from "$lib/cta";
-import { TransitArrival } from "$lib/arrivals/TransitArrival";
+import { TransitArrival, TrainArrival } from "$lib/arrivals/TransitArrival";
 
 function predictionTimestamp(arrival) {
   const arrivalTime = arrival?.arrivalTime;
@@ -37,8 +37,7 @@ function normalizeTrainArrival(arrival, chosenStationId, stationById) {
   const station = stationById.get(chosenStationId);
   const normalizedStopId = Number.parseInt(chosenStationId, 10);
 
-  return new TransitArrival({
-    type: arrival.type,
+  return new TrainArrival({
     stationId: arrival.stationId ?? normalizedStopId,
     stopId: arrival.stopId ?? normalizedStopId,
     route: arrival.route,

@@ -58,19 +58,33 @@ export class TransitStop {
     this.name = name;
     this.type = type;
     this.distanceMiles = distanceMiles;
-    this.arrivals = arrivals.map((arrival) =>
-      arrival instanceof TransitArrival ? arrival : TransitArrival.fromPrediction(arrival)
-    );
+    this.arrivals = arrivals.map((arrival) => {
+      if (!(arrival instanceof TransitArrival)) {
+        throw new TypeError('TransitStop.arrivals must be TransitArrival instances');
+      }
+
+      return arrival;
+    });
   }
 
   static fromStopData(stop) {
-    return new TransitStop({
+    const stopData = {
       stopId: stop.stopId,
       name: stop.displayName,
       type: stop.type,
       distanceMiles: stop.distanceMiles,
       arrivals: stop.predictions ?? []
-    });
+    };
+
+    if (stop.type === 'train') {
+      return new TrainStop(stopData);
+    }
+
+    if (stop.type === 'bus') {
+      return new BusStop(stopData);
+    }
+
+    return new TransitStop(stopData);
   }
 
   distanceFromUser({ walkSpeedMph = 2 } = {}) {
@@ -86,56 +100,46 @@ export class TransitStop {
   }
 
   groupArrivals({ walkSpeedMph = 2 } = {}) {
+    return { routes: [], directions: [] };
+  }
+
+  GroupArrivals(options = {}) {
+    return this.groupArrivals(options);
+  }
+
+  get icon() {
+    return this.type === 'train' ? '🚉 ' : '🚌';
+  }
+
+  get stopCategory() {
+    return this.type === 'train' ? 'Station' : 'Bus Stop';
+  }
+
+  toUpcomingStop({ walkSpeedMph = 2 } = {}) {
+    const distance = this.distanceFromUser({ walkSpeedMph });
+    const grouped = this.groupArrivals({ walkSpeedMph });
+
+    return {
+      stopId: this.stopId,
+      type: this.type,
+      icon: this.icon,
+      distanceText: distance.distanceText,
+      walkText: distance.walkText,
+      stopName: this.name,
+      stopCategory: this.stopCategory,
+      routes: grouped.routes,
+      directions: grouped.directions
+    };
+  }
+}
+
+export class BusStop extends TransitStop {
+  constructor(stop) {
+    super({ ...stop, type: 'bus' });
+  }
+
+  groupArrivals({ walkSpeedMph = 2 } = {}) {
     const walkMinutes = walkingMinutesFromMiles(this.distanceMiles, walkSpeedMph);
-
-    if (this.type === 'train') {
-      const groupedByRoute = new Map();
-
-      for (const arrival of this.arrivals) {
-        const routeName = String(arrival.route);
-        const directionLabel = String(arrival.direction);
-        const routeGroup = groupedByRoute.get(routeName) ?? {
-          route: routeName,
-          typeLabel: 'Line',
-          directions: new Map()
-        };
-
-        const directionGroup = routeGroup.directions.get(directionLabel) ?? [];
-        directionGroup.push(arrival);
-        routeGroup.directions.set(directionLabel, directionGroup);
-        groupedByRoute.set(routeName, routeGroup);
-      }
-
-      const routes = [...groupedByRoute.values()]
-        .map((routeGroup) => ({
-          route: routeGroup.route,
-          typeLabel: routeGroup.typeLabel,
-          destinations: [...routeGroup.directions.entries()]
-            .map(([direction, directionArrivals]) => ({
-              direction,
-              etas: normalizeEtas(directionArrivals, walkMinutes)
-            }))
-            .sort((a, b) =>
-              compareLocaleWithFallback(
-                a.direction,
-                b.direction,
-                a.etas[0]?.sortTime ?? Number.MAX_SAFE_INTEGER,
-                b.etas[0]?.sortTime ?? Number.MAX_SAFE_INTEGER
-              )
-            )
-        }))
-        .sort((a, b) =>
-          compareLocaleWithFallback(
-            a.route,
-            b.route,
-            a.destinations[0]?.etas[0]?.sortTime ?? Number.MAX_SAFE_INTEGER,
-            b.destinations[0]?.etas[0]?.sortTime ?? Number.MAX_SAFE_INTEGER
-          )
-        );
-
-      return { routes, directions: [] };
-    }
-
     const groupedByDirection = new Map();
 
     for (const arrival of this.arrivals) {
@@ -186,24 +190,74 @@ export class TransitStop {
     return { routes: [], directions };
   }
 
-  GroupArrivals(options = {}) {
-    return this.groupArrivals(options);
+  get icon() {
+    return '🚌';
   }
 
-  toUpcomingStop({ walkSpeedMph = 2 } = {}) {
-    const distance = this.distanceFromUser({ walkSpeedMph });
-    const grouped = this.groupArrivals({ walkSpeedMph });
+  get stopCategory() {
+    return 'Bus Stop';
+  }
+}
 
-    return {
-      stopId: this.stopId,
-      type: this.type,
-      icon: this.type === 'train' ? '🚉 ' : '🚌',
-      distanceText: distance.distanceText,
-      walkText: distance.walkText,
-      stopName: this.name,
-      stopCategory: this.type === 'train' ? 'Station' : 'Bus Stop',
-      routes: grouped.routes,
-      directions: grouped.directions
-    };
+export class TrainStop extends TransitStop {
+  constructor(stop) {
+    super({ ...stop, type: 'train' });
+  }
+
+  groupArrivals({ walkSpeedMph = 2 } = {}) {
+    const walkMinutes = walkingMinutesFromMiles(this.distanceMiles, walkSpeedMph);
+    const groupedByRoute = new Map();
+
+    for (const arrival of this.arrivals) {
+      const routeName = String(arrival.route);
+      const directionLabel = String(arrival.direction);
+      const routeGroup = groupedByRoute.get(routeName) ?? {
+        route: routeName,
+        typeLabel: 'Line',
+        directions: new Map()
+      };
+
+      const directionGroup = routeGroup.directions.get(directionLabel) ?? [];
+      directionGroup.push(arrival);
+      routeGroup.directions.set(directionLabel, directionGroup);
+      groupedByRoute.set(routeName, routeGroup);
+    }
+
+    const routes = [...groupedByRoute.values()]
+      .map((routeGroup) => ({
+        route: routeGroup.route,
+        typeLabel: routeGroup.typeLabel,
+        destinations: [...routeGroup.directions.entries()]
+          .map(([direction, directionArrivals]) => ({
+            direction,
+            etas: normalizeEtas(directionArrivals, walkMinutes)
+          }))
+          .sort((a, b) =>
+            compareLocaleWithFallback(
+              a.direction,
+              b.direction,
+              a.etas[0]?.sortTime ?? Number.MAX_SAFE_INTEGER,
+              b.etas[0]?.sortTime ?? Number.MAX_SAFE_INTEGER
+            )
+          )
+      }))
+      .sort((a, b) =>
+        compareLocaleWithFallback(
+          a.route,
+          b.route,
+          a.destinations[0]?.etas[0]?.sortTime ?? Number.MAX_SAFE_INTEGER,
+          b.destinations[0]?.etas[0]?.sortTime ?? Number.MAX_SAFE_INTEGER
+        )
+      );
+
+    return { routes, directions: [] };
+  }
+
+  get icon() {
+    return '🚉 ';
+  }
+
+  get stopCategory() {
+    return 'Station';
   }
 }
