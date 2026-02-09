@@ -1,11 +1,12 @@
-const BUS_API_URL = 'https://www.ctabustracker.com/bustime/api/v3/getpredictions';
+const BUS_API_URL =
+  "https://www.ctabustracker.com/bustime/api/v3/getpredictions";
 const CORS_HEADERS = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Methods': 'GET,OPTIONS',
-  'Access-Control-Allow-Headers': 'Content-Type',
-  'Access-Control-Max-Age': '86400'
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Methods": "GET,OPTIONS",
+  "Access-Control-Allow-Headers": "Content-Type",
+  "Access-Control-Max-Age": "86400",
 };
-const ALLOWED_QUERY_PARAMS = ['stpid', 'top', 'rt', 'rtdir'];
+const ALLOWED_QUERY_PARAMS = ["stpid", "top", "rt", "rtdir"];
 
 function withCorsHeaders(response) {
   const headers = new Headers(response.headers);
@@ -15,7 +16,7 @@ function withCorsHeaders(response) {
   return new Response(response.body, {
     status: response.status,
     statusText: response.statusText,
-    headers
+    headers,
   });
 }
 
@@ -24,8 +25,8 @@ function jsonError(message, status = 500) {
     status,
     headers: {
       ...CORS_HEADERS,
-      'content-type': 'application/json; charset=utf-8'
-    }
+      "content-type": "application/json; charset=utf-8",
+    },
   });
 }
 
@@ -45,25 +46,25 @@ export function onRequestOptions() {
 }
 
 export async function onRequestGet({ request, env }) {
-  const busApiKey = String(env.BUS_API_KEY ?? '').trim();
+  const busApiKey = String(env.BUS_API_KEY ?? "").trim();
   if (!busApiKey) {
-    return jsonError('Missing BUS_API_KEY secret.', 500);
+    return jsonError("Missing BUS_API_KEY secret.", 500);
   }
 
   const incomingUrl = new URL(request.url);
   const upstreamUrl = new URL(BUS_API_URL);
   copyAllowedSearchParams(incomingUrl.searchParams, upstreamUrl.searchParams);
-  upstreamUrl.searchParams.set('format', 'json');
-  upstreamUrl.searchParams.set('key', busApiKey);
+  upstreamUrl.searchParams.set("format", "json");
+  upstreamUrl.searchParams.set("key", busApiKey);
 
   try {
     const upstreamResponse = await fetch(upstreamUrl.toString(), {
       headers: {
-        Accept: 'application/json'
-      }
+        Accept: "application/json",
+      },
     });
     return withCorsHeaders(upstreamResponse);
   } catch {
-    return jsonError('Failed to fetch CTA bus predictions.', 502);
+    return jsonError("Failed to fetch CTA bus predictions.", 502);
   }
 }

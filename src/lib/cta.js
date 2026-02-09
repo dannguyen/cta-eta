@@ -1,44 +1,44 @@
 const EARTH_RADIUS_MILES = 3958.8;
 
 export const TRAIN_LINE_META = {
-  RED: { code: 'RED', id: 'Red', color: '#d7263d' },
-  BLUE: { code: 'BLUE', id: 'Blue', color: '#2074d4' },
-  BRN: { code: 'BRN', id: 'Brown', color: '#7b4b2a' },
-  G: { code: 'G', id: 'Green', color: '#009b3a' },
-  ORG: { code: 'ORG', id: 'Orange', color: '#f47b20' },
-  P: { code: 'P', id: 'Purple', color: '#522398' },
-  PINK: { code: 'PINK', id: 'Pink', color: '#e27ea6' },
-  Y: { code: 'Y', id: 'Yellow', color: '#f4c300' }
+  RED: { code: "RED", id: "Red", color: "#d7263d" },
+  BLUE: { code: "BLUE", id: "Blue", color: "#2074d4" },
+  BRN: { code: "BRN", id: "Brown", color: "#7b4b2a" },
+  G: { code: "G", id: "Green", color: "#009b3a" },
+  ORG: { code: "ORG", id: "Orange", color: "#f47b20" },
+  P: { code: "P", id: "Purple", color: "#522398" },
+  PINK: { code: "PINK", id: "Pink", color: "#e27ea6" },
+  Y: { code: "Y", id: "Yellow", color: "#f4c300" },
 };
 
 const TRAIN_LINE_NAME_TO_CODE = {
-  red: 'RED',
-  blue: 'BLUE',
-  brown: 'BRN',
-  green: 'G',
-  orange: 'ORG',
-  purple: 'P',
-  pink: 'PINK',
-  yellow: 'Y'
+  red: "RED",
+  blue: "BLUE",
+  brown: "BRN",
+  green: "G",
+  orange: "ORG",
+  purple: "P",
+  pink: "PINK",
+  yellow: "Y",
 };
 
 const TRAIN_ROUTE_TO_CODE = {
-  Red: 'RED',
-  Blue: 'BLUE',
-  Brn: 'BRN',
-  G: 'G',
-  Org: 'ORG',
-  P: 'P',
-  Pink: 'PINK',
-  Y: 'Y'
+  Red: "RED",
+  Blue: "BLUE",
+  Brn: "BRN",
+  G: "G",
+  Org: "ORG",
+  P: "P",
+  Pink: "PINK",
+  Y: "Y",
 };
 
 export function parseKeysFile(raw) {
-  const keys = { train: '', bus: '' };
+  const keys = { train: "", bus: "" };
 
   for (const line of raw.split(/\r?\n/)) {
     const trimmed = line.trim();
-    if (!trimmed || trimmed.startsWith('#')) {
+    if (!trimmed || trimmed.startsWith("#")) {
       continue;
     }
 
@@ -54,11 +54,11 @@ export function parseKeysFile(raw) {
       value = value.slice(1, -1);
     }
 
-    if (key === 'train' || key === 'train_api_key') {
+    if (key === "train" || key === "train_api_key") {
       keys.train = value;
     }
 
-    if (key === 'bus' || key === 'bus_api_key') {
+    if (key === "bus" || key === "bus_api_key") {
       keys.bus = value;
     }
   }
@@ -69,7 +69,7 @@ export function parseKeysFile(raw) {
 export function parseCsv(text) {
   const rows = [];
   let row = [];
-  let field = '';
+  let field = "";
   let inQuotes = false;
 
   for (let i = 0; i < text.length; i += 1) {
@@ -89,15 +89,15 @@ export function parseCsv(text) {
 
     if (char === '"') {
       inQuotes = true;
-    } else if (char === ',') {
+    } else if (char === ",") {
       row.push(field);
-      field = '';
-    } else if (char === '\n') {
+      field = "";
+    } else if (char === "\n") {
       row.push(field);
       rows.push(row);
       row = [];
-      field = '';
-    } else if (char !== '\r') {
+      field = "";
+    } else if (char !== "\r") {
       field += char;
     }
   }
@@ -113,11 +113,11 @@ export function parseCsv(text) {
 
   const [header, ...dataRows] = rows;
   return dataRows
-    .filter((cols) => cols.length > 0 && cols.some((value) => value !== ''))
+    .filter((cols) => cols.length > 0 && cols.some((value) => value !== ""))
     .map((cols) => {
       const record = {};
       for (let i = 0; i < header.length; i += 1) {
-        record[header[i]] = cols[i] ?? '';
+        record[header[i]] = cols[i] ?? "";
       }
       return record;
     });
@@ -148,7 +148,7 @@ function parseStationLines(linesValue) {
   const result = [];
   const seenCodes = new Set();
 
-  for (const rawPart of String(linesValue ?? '').split(',')) {
+  for (const rawPart of String(linesValue ?? "").split(",")) {
     const lineName = rawPart.trim();
     if (!lineName) {
       continue;
@@ -176,16 +176,19 @@ export function parseTrainStations(csvText) {
 
   return rows
     .map((row) => ({
-      type: 'train',
+      type: "train",
       stopId: row.STATION_ID,
       stationId: row.STATION_ID,
       stationName: row.LONGNAME,
       displayName: row.LONGNAME,
       latitude: toNumber(row.latitude),
       longitude: toNumber(row.longitude),
-      lines: parseStationLines(row.LINES)
+      lines: parseStationLines(row.LINES),
     }))
-    .filter((stop) => stop.latitude !== null && stop.longitude !== null && stop.stopId);
+    .filter(
+      (stop) =>
+        stop.latitude !== null && stop.longitude !== null && stop.stopId,
+    );
 }
 
 export function parseBusStops(csvText) {
@@ -207,14 +210,14 @@ export function parseBusStops(csvText) {
     let stop = grouped.get(id);
     if (!stop) {
       stop = {
-        type: 'bus',
+        type: "bus",
         stopId: id,
         displayName: row.PUBLIC_NAM || `${row.STREET} & ${row.CROSS_ST}`,
         latitude: lat,
         longitude: lon,
         directions: new Set(),
         routes: new Set(),
-        routeDirections: new Set()
+        routeDirections: new Set(),
       };
       grouped.set(id, stop);
     }
@@ -225,7 +228,7 @@ export function parseBusStops(csvText) {
     }
 
     if (row.ROUTESSTPG) {
-      for (const route of row.ROUTESSTPG.split(',')) {
+      for (const route of row.ROUTESSTPG.split(",")) {
         const trimmedRoute = route.trim();
         if (trimmedRoute) {
           stop.routes.add(trimmedRoute);
@@ -248,14 +251,16 @@ export function withDistance(stops, userLocation) {
         userLocation.latitude,
         userLocation.longitude,
         stop.latitude,
-        stop.longitude
-      )
+        stop.longitude,
+      ),
     }))
     .sort((a, b) => a.distanceMiles - b.distanceMiles);
 }
 
 export function withinRadius(stops, userLocation, radiusMiles) {
-  return withDistance(stops, userLocation).filter((stop) => stop.distanceMiles <= radiusMiles);
+  return withDistance(stops, userLocation).filter(
+    (stop) => stop.distanceMiles <= radiusMiles,
+  );
 }
 
 function uniqueByStopId(stops) {
@@ -268,12 +273,16 @@ function uniqueByStopId(stops) {
     }
   }
 
-  return [...byStopId.values()].sort((a, b) => a.distanceMiles - b.distanceMiles);
+  return [...byStopId.values()].sort(
+    (a, b) => a.distanceMiles - b.distanceMiles,
+  );
 }
 
 export function selectNearestBusStopsByRouteDirection(stops) {
   const nearestByRouteDirection = new Map();
-  const sortedStops = [...stops].sort((a, b) => a.distanceMiles - b.distanceMiles);
+  const sortedStops = [...stops].sort(
+    (a, b) => a.distanceMiles - b.distanceMiles,
+  );
 
   for (const stop of sortedStops) {
     const pairs = stop.routeDirections ?? [];
@@ -288,13 +297,18 @@ export function selectNearestBusStopsByRouteDirection(stops) {
   return uniqueByStopId([...nearestByRouteDirection.values()]);
 }
 
-export function selectNearestTrainStopsByLineDirection(stops, limitPerLineDirection = 2) {
+export function selectNearestTrainStopsByLineDirection(
+  stops,
+  limitPerLineDirection = 2,
+) {
   const selectedCounts = new Map();
   const selectedStops = [];
-  const sortedStops = [...stops].sort((a, b) => a.distanceMiles - b.distanceMiles);
+  const sortedStops = [...stops].sort(
+    (a, b) => a.distanceMiles - b.distanceMiles,
+  );
 
   for (const stop of sortedStops) {
-    const directionId = stop.directionId || 'UNKNOWN';
+    const directionId = stop.directionId || "UNKNOWN";
     for (const line of stop.lines ?? []) {
       const groupKey = `${line.code}|${directionId}`;
       const currentCount = selectedCounts.get(groupKey) ?? 0;
@@ -314,7 +328,7 @@ export function trainDisplayFromRoute(rt) {
   const meta = code ? TRAIN_LINE_META[code] : null;
   return {
     code: code ?? rt,
-    name: meta?.id ?? rt
+    name: meta?.id ?? rt,
   };
 }
 
@@ -346,7 +360,9 @@ export function parseBusApiDate(value) {
     return null;
   }
 
-  const match = String(value).match(/^(\d{4})(\d{2})(\d{2})\s(\d{2}):(\d{2})(?::(\d{2}))?$/);
+  const match = String(value).match(
+    /^(\d{4})(\d{2})(\d{2})\s(\d{2}):(\d{2})(?::(\d{2}))?$/,
+  );
   if (!match) {
     return null;
   }
@@ -357,7 +373,7 @@ export function parseBusApiDate(value) {
     Number(match[3]),
     Number(match[4]),
     Number(match[5]),
-    Number(match[6] ?? 0)
+    Number(match[6] ?? 0),
   );
 }
 
@@ -373,18 +389,18 @@ export function minutesUntil(date) {
 
 export function formatClock(date) {
   if (!(date instanceof Date) || Number.isNaN(date.getTime())) {
-    return 'Unknown time';
+    return "Unknown time";
   }
 
-  return new Intl.DateTimeFormat('en-US', {
-    hour: 'numeric',
-    minute: '2-digit'
+  return new Intl.DateTimeFormat("en-US", {
+    hour: "numeric",
+    minute: "2-digit",
   }).format(date);
 }
 
 export function formatDistance(miles) {
   if (!Number.isFinite(miles)) {
-    return '';
+    return "";
   }
 
   if (miles < 0.1) {
@@ -396,15 +412,15 @@ export function formatDistance(miles) {
 
 export function formatMinutes(mins) {
   if (mins === null || mins === undefined) {
-    return 'Unknown';
+    return "Unknown";
   }
 
   if (mins <= 0) {
-    return 'Due';
+    return "Due";
   }
 
   if (mins === 1) {
-    return '1 min';
+    return "1 min";
   }
 
   return `${mins} min`;
@@ -435,9 +451,9 @@ export function nextPerRoute(predictions) {
 
 export function escapeHtml(value) {
   return String(value)
-    .replaceAll('&', '&amp;')
-    .replaceAll('<', '&lt;')
-    .replaceAll('>', '&gt;')
-    .replaceAll('"', '&quot;')
-    .replaceAll("'", '&#39;');
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#39;");
 }

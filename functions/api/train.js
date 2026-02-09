@@ -1,11 +1,11 @@
-const TRAIN_API_URL = 'https://lapi.transitchicago.com/api/1.0/ttarrivals.aspx';
+const TRAIN_API_URL = "https://lapi.transitchicago.com/api/1.0/ttarrivals.aspx";
 const CORS_HEADERS = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Methods': 'GET,OPTIONS',
-  'Access-Control-Allow-Headers': 'Content-Type',
-  'Access-Control-Max-Age': '86400'
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Methods": "GET,OPTIONS",
+  "Access-Control-Allow-Headers": "Content-Type",
+  "Access-Control-Max-Age": "86400",
 };
-const ALLOWED_QUERY_PARAMS = ['mapid', 'max', 'rt'];
+const ALLOWED_QUERY_PARAMS = ["mapid", "max", "rt"];
 
 function withCorsHeaders(response) {
   const headers = new Headers(response.headers);
@@ -15,7 +15,7 @@ function withCorsHeaders(response) {
   return new Response(response.body, {
     status: response.status,
     statusText: response.statusText,
-    headers
+    headers,
   });
 }
 
@@ -24,8 +24,8 @@ function jsonError(message, status = 500) {
     status,
     headers: {
       ...CORS_HEADERS,
-      'content-type': 'application/json; charset=utf-8'
-    }
+      "content-type": "application/json; charset=utf-8",
+    },
   });
 }
 
@@ -45,25 +45,25 @@ export function onRequestOptions() {
 }
 
 export async function onRequestGet({ request, env }) {
-  const trainApiKey = String(env.TRAIN_API_KEY ?? '').trim();
+  const trainApiKey = String(env.TRAIN_API_KEY ?? "").trim();
   if (!trainApiKey) {
-    return jsonError('Missing TRAIN_API_KEY secret.', 500);
+    return jsonError("Missing TRAIN_API_KEY secret.", 500);
   }
 
   const incomingUrl = new URL(request.url);
   const upstreamUrl = new URL(TRAIN_API_URL);
   copyAllowedSearchParams(incomingUrl.searchParams, upstreamUrl.searchParams);
-  upstreamUrl.searchParams.set('outputType', 'JSON');
-  upstreamUrl.searchParams.set('key', trainApiKey);
+  upstreamUrl.searchParams.set("outputType", "JSON");
+  upstreamUrl.searchParams.set("key", trainApiKey);
 
   try {
     const upstreamResponse = await fetch(upstreamUrl.toString(), {
       headers: {
-        Accept: 'application/json'
-      }
+        Accept: "application/json",
+      },
     });
     return withCorsHeaders(upstreamResponse);
   } catch {
-    return jsonError('Failed to fetch CTA train arrivals.', 502);
+    return jsonError("Failed to fetch CTA train arrivals.", 502);
   }
 }

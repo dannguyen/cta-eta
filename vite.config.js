@@ -1,20 +1,21 @@
-import { sveltekit } from '@sveltejs/kit/vite';
-import { defineConfig } from 'vite';
-import fs from 'node:fs';
-import path from 'node:path';
+import { sveltekit } from "@sveltejs/kit/vite";
+import { defineConfig } from "vite";
+import fs from "node:fs";
+import path from "node:path";
 
-const TRAIN_API_URL = 'https://lapi.transitchicago.com/api/1.0/ttarrivals.aspx';
-const BUS_API_URL = 'https://www.ctabustracker.com/bustime/api/v3/getpredictions';
+const TRAIN_API_URL = "https://lapi.transitchicago.com/api/1.0/ttarrivals.aspx";
+const BUS_API_URL =
+  "https://www.ctabustracker.com/bustime/api/v3/getpredictions";
 
 function parseKeyFile(raw) {
   const keys = {
-    train: '',
-    bus: ''
+    train: "",
+    bus: "",
   };
 
   for (const line of raw.split(/\r?\n/)) {
     const trimmed = line.trim();
-    if (!trimmed || trimmed.startsWith('#')) {
+    if (!trimmed || trimmed.startsWith("#")) {
       continue;
     }
 
@@ -29,10 +30,10 @@ function parseKeyFile(raw) {
       value = value.slice(1, -1);
     }
 
-    if (key === 'train' || key === 'train_api_key') {
+    if (key === "train" || key === "train_api_key") {
       keys.train = value;
     }
-    if (key === 'bus' || key === 'bus_api_key') {
+    if (key === "bus" || key === "bus_api_key") {
       keys.bus = value;
     }
   }
@@ -41,36 +42,39 @@ function parseKeyFile(raw) {
 }
 
 function loadDevKeys() {
-  const keyPath = path.resolve(process.cwd(), 'static/keys.toml');
+  const keyPath = path.resolve(process.cwd(), "static/keys.toml");
   if (!fs.existsSync(keyPath)) {
-    return { train: '', bus: '' };
+    return { train: "", bus: "" };
   }
-  return parseKeyFile(fs.readFileSync(keyPath, 'utf8'));
+  return parseKeyFile(fs.readFileSync(keyPath, "utf8"));
 }
 
 function ctaDevApiMiddleware() {
   return {
-    name: 'cta-dev-api-middleware',
+    name: "cta-dev-api-middleware",
     configureServer(server) {
       server.middlewares.use(async (req, res, next) => {
-        const reqUrl = req.url || '';
-        if (!reqUrl.startsWith('/api/train') && !reqUrl.startsWith('/api/bus')) {
+        const reqUrl = req.url || "";
+        if (
+          !reqUrl.startsWith("/api/train") &&
+          !reqUrl.startsWith("/api/bus")
+        ) {
           next();
           return;
         }
 
         const keys = loadDevKeys();
-        const origin = `http://${req.headers.host || 'localhost'}`;
+        const origin = `http://${req.headers.host || "localhost"}`;
         const incomingUrl = new URL(reqUrl, origin);
-        const isTrain = incomingUrl.pathname === '/api/train';
-        const isBus = incomingUrl.pathname === '/api/bus';
+        const isTrain = incomingUrl.pathname === "/api/train";
+        const isBus = incomingUrl.pathname === "/api/bus";
 
         if (!isTrain && !isBus) {
           next();
           return;
         }
 
-        if (req.method === 'OPTIONS') {
+        if (req.method === "OPTIONS") {
           res.statusCode = 204;
           res.end();
           return;
@@ -79,11 +83,11 @@ function ctaDevApiMiddleware() {
         const key = isTrain ? keys.train : keys.bus;
         if (!key) {
           res.statusCode = 500;
-          res.setHeader('content-type', 'application/json; charset=utf-8');
+          res.setHeader("content-type", "application/json; charset=utf-8");
           res.end(
             JSON.stringify({
-              error: `Missing ${isTrain ? 'TRAIN_API_KEY' : 'BUS_API_KEY'} in static/keys.toml for local dev.`
-            })
+              error: `Missing ${isTrain ? "TRAIN_API_KEY" : "BUS_API_KEY"} in static/keys.toml for local dev.`,
+            }),
           );
           return;
         }
@@ -93,36 +97,39 @@ function ctaDevApiMiddleware() {
           upstreamUrl.searchParams.append(param, value);
         }
         if (isTrain) {
-          upstreamUrl.searchParams.set('outputType', 'JSON');
+          upstreamUrl.searchParams.set("outputType", "JSON");
         } else {
-          upstreamUrl.searchParams.set('format', 'json');
+          upstreamUrl.searchParams.set("format", "json");
         }
-        upstreamUrl.searchParams.set('key', key);
+        upstreamUrl.searchParams.set("key", key);
 
         try {
           const upstream = await fetch(upstreamUrl.toString(), {
             headers: {
-              Accept: 'application/json'
-            }
+              Accept: "application/json",
+            },
           });
           const body = await upstream.text();
           res.statusCode = upstream.status;
-          res.setHeader('content-type', upstream.headers.get('content-type') || 'application/json');
+          res.setHeader(
+            "content-type",
+            upstream.headers.get("content-type") || "application/json",
+          );
           res.end(body);
         } catch {
           res.statusCode = 502;
-          res.setHeader('content-type', 'application/json; charset=utf-8');
+          res.setHeader("content-type", "application/json; charset=utf-8");
           res.end(
             JSON.stringify({
-              error: `Failed to reach CTA ${isTrain ? 'train' : 'bus'} API.`
-            })
+              error: `Failed to reach CTA ${isTrain ? "train" : "bus"} API.`,
+            }),
           );
         }
       });
-    }
+    },
   };
 }
 
 export default defineConfig({
-  plugins: [sveltekit(), ctaDevApiMiddleware()]
+  plugins: [sveltekit(), ctaDevApiMiddleware()],
 });

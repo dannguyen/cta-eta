@@ -32,34 +32,32 @@ Cloudflare Pages build settings:
 - User visits the CTA ETA Webapp page
 - Webapp requests permission to get user geospatial location
 - Using the user's coordinates, the webapp then reads the following static data files of stop locations:
-    - read bus stop data [static/data/cta-bus-stops.csv](static/data/cta-bus-stops.csv)
-        - find the nearest 10 bus stops within 0.5 miles of the user
+  - read bus stop data [static/data/cta-bus-stops.csv](static/data/cta-bus-stops.csv)
+    - find the nearest 10 bus stops within 0.5 miles of the user
 
-    - read train station data from [static/data/cta-train-stations.csv](static/data/cta-train-stations.csv)
-        - find all the train stations within a 0.5 mile radius from the user
+  - read train station data from [static/data/cta-train-stations.csv](static/data/cta-train-stations.csv)
+    - find all the train stations within a 0.5 mile radius from the user
 
 - Now that you've gathered bus stop IDs(`STOP_ID`) and train station IDs (`STATION_ID`), use them to call the respective CTA APIs:
+  - Iterating through each train station `STATION_ID`, call the [Train Tracker Arrivals API](#mark-train-tracker-arrivals-api) and find all the closest trains per arriving route/line (i.e. `rt` attribute) per direction (i.e. `destNm`)
+    - Use the [color key](#mark-train-color-key) to translate the `rt` values to human readable colors
 
-
-    - Iterating through each train station `STATION_ID`, call the [Train Tracker Arrivals API](#mark-train-tracker-arrivals-api) and find all the closest trains per arriving route/line (i.e. `rt` attribute) per direction (i.e. `destNm`)
-        - Use the [color key](#mark-train-color-key) to translate the `rt` values to human readable colors
-
-
-    - Iterating through each bus stop STOP_ID, call the [Bus Get Predictions API](#mark-bus-get-predictions-api) (the `stpid` parameter can take up to 10 STOP_ID values.
-        - Find all the distinct combinations of route name and route direction — `rt` and `rtDir`, respectively
-        - Find the closest arriving bus per route and per direction, and collect their respective stop IDs (go to the [Bus arrivals/stops filtering](#mark-bus-stop-filtering) section for more details)
-        -
+  - Iterating through each bus stop STOP_ID, call the [Bus Get Predictions API](#mark-bus-get-predictions-api) (the `stpid` parameter can take up to 10 STOP_ID values.
+    - Find all the distinct combinations of route name and route direction — `rt` and `rtDir`, respectively
+    - Find the closest arriving bus per route and per direction, and collect their respective stop IDs (go to the [Bus arrivals/stops filtering](#mark-bus-stop-filtering) section for more details)
+    -
 
 - Render the bus and train stops on a Leaflet OpenStreetMap
-    - NOTE: for bus stops, we don't want to render all 10 bus stops. We want to render just the bus stops for the closest buses (per route and per direction). So you'll have to use collect the corresponding `stpid` (stop id) in the bus API response, and only map the bus stops that have stop ids collected from the list of nearest buses.
-    - attach click eventhandlers that show the ETAs for each clicked stop
+  - NOTE: for bus stops, we don't want to render all 10 bus stops. We want to render just the bus stops for the closest buses (per route and per direction). So you'll have to use collect the corresponding `stpid` (stop id) in the bus API response, and only map the bus stops that have stop ids collected from the list of nearest buses.
+  - attach click eventhandlers that show the ETAs for each clicked stop
 - Render a text list of the bus and train stops, with the ETAs of arriving trains/buses
 
-
 ### Mapping
+
 The web app should also use a Leaflet + Openstreet map to show the user's current location and the locations of the nearest stops.
 
 For the map icons:
+
 - the map marker color for bus stops should be in black
 - the map marker color for rail stops should be based on the name of the rail line, e.g. the Red line stops should have red map markers
 - Some train stations have multiple lines, indicated as a comma-delimited list of colors in the `LINES` column. In that case, the map marker should show a combination of those colors, e.g. like a round icon containing a red, blue, and brown circle for a station with red, blue, and brown lines
@@ -69,16 +67,11 @@ Below the map should be a simple list of the nearest stops, along with the close
 
 By default, the app should find the stops within a half-mile radius of the user's location.
 
-
-
-
 ## Data details
 
 This web app uses a combination of data cached in `static/data` and APIs from the CTA data portal.
 
 ### Static data
-
-
 
 #### CTA L Stations
 
@@ -87,7 +80,6 @@ This web app uses a combination of data cached in `static/data` and APIs from th
 This is a CSV that lists all the train stops.
 
 The `LINES` column contains a comma-delimited string of human readable color names: use this to make the corresponding map marker.
-
 
 The `STATION_ID` is passed to the Train Tracker API's `mapid` parameter.
 
@@ -103,8 +95,6 @@ When the visitor loads the web page, the app should call the relevant CTA APIs v
 
 CTA API Developer homepage: https://www.transitchicago.com/developers/
 
-
-
 <div id="mark-bus-get-predictions-api"></div>
 
 #### Bus Get Predictions API
@@ -116,12 +106,9 @@ Documentation stored locally:
 Sample call:
 https://www.ctabustracker.com/bustime/api/v3/getpredictions?key=API_DEV_KEY&format=json&stpid=14545
 
-
 Sample data: [tests/samples/bus-predictions.json](./tests/samples/bus-predictions.json)
 
-
 The API JSON response returns a `prd` array, with each entry consisting of a predicted bus arrival. However, we don't want to list EVERY bus, just the nearest bus, per route (`rt` attribute) and direction (`rtdir` attribute).
-
 
 <div id="mark-bus-stop-filtering"></div>
 
@@ -144,7 +131,6 @@ The data flow process for bus data is thus:
 - Then for each rt/rtdir combination per each stop, find the two closest buses by ETA — that way if the user won't catch the most recent bus+route at a stop, they know when the next one is coming
 - Map only the bus stops whose stop IDs are found in that filtered list of closest buses per rt/rtdirs
 
-
 ###### Additional bus stop filtering
 
 Bus stops for different directions (e.g. Northbound and Southbound) for given route (e.g. 36) tend to be across the street from each other and share the same name (e.g. the corner closest to them, like "Bryn Mawr & Clark St". So after all the close bus stops and arriving bus data is collected, I want to do an additional level of filtering.
@@ -156,15 +142,11 @@ Create one "stop" group with the name of "Sheridan & Winthrop", that contains al
 That way, when we list the "Upcoming Arrivals", we can list the groupings as such:
 
 - Name of stop (Sheridan & Winthrop)
-    - Name of route (147)
-        - Northbound: arriving in x minutes and y minutes
-        - Southbound: arriving in z minutes and q minutes
+  - Name of route (147)
+    - Northbound: arriving in x minutes and y minutes
+    - Southbound: arriving in z minutes and q minutes
 
 For map marking, keep track of the lat/lng for the Northbound and Southbound version of the stop. Place the marker at the midpoint of those coordinates. There should be one map marker for the "Sheridan & Winthrop" stop
-
-
-
-
 
 <div id="mark-train-tracker-arrivals-api"></div>
 
@@ -202,7 +184,6 @@ Map/list the collected stations and their closest trains
 - Then find the two closest ETA trains per station + rt + destNm combination
 - Map only the train stations whose STATION_ID are found in that list of `staId` collected for the closest trains via the API.
 
-
 <div id="mark-train-color-key"></div>
 
 ##### Color key
@@ -217,5 +198,3 @@ Each entry in the `eta` array has a `rt` attribute. Use the following key to tra
 • P = Purple
 • Pink = Pink
 • Y = Yellow
-
-
