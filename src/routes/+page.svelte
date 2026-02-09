@@ -990,22 +990,25 @@
               {#if stop.type === 'train'}
                 {#each stop.routes as route}
                   <li class="direction-group-item">
-                    <span class="route-name train {route.route.toLowerCase()}">
-                    {route.route}
-                    <span class="route-type">{route.typeLabel}</span>
-        </span>
                     <ul class="direction-list">
-                      {#each route.destinations as destination}
-                        <li class="route-item train-row">
+                      {#each route.destinations as destination, destinationIndex}
+                        <li class="route-item train">
+                          <span class="group-label" class:ghost={destinationIndex > 0}>
+                            <span class="route-name train {route.route.toLowerCase()}">
+                              {route.route}
+                              <span class="route-type">Line</span>
+                            </span>
+                          </span>
                           <span class="route-label arrival-emphasis">{destination.direction}</span>
                           <span class="eta-stack">
                             {#each destination.etas as eta}
                               <span class="eta-line">
-                                <span class={`eta-part eta-value ${eta.timingClass} ${eta.descriptor}`}>
-                                {etaValueText(eta.minutes)}</span>
-                                {#if etaUnitText(eta.minutes)}
-                                  <span class="eta-unit">{etaUnitText(eta.minutes)}</span>
-                                {/if}
+                                <span class={`eta-part eta-min ${eta.timingClass} ${eta.descriptor}`}>
+                                  <span class="eta-value">{etaValueText(eta.minutes)}</span>
+                                  {#if etaUnitText(eta.minutes)}
+                                    <span class="eta-unit">{etaUnitText(eta.minutes)}</span>
+                                  {/if}
+                                </span>
                                 <span class={`eta-part clock`}>{eta.clockText}</span>
                               </span>
                             {/each}
@@ -1018,21 +1021,25 @@
               {:else}
                 {#each stop.directions as direction}
                   <li class="direction-group-item">
-                    <span class="arrival-emphasis">{direction.direction}</span>
                     <ul class="direction-list">
-                      {#each direction.routes as route}
-                        <li class="route-item bus-row">
+                      {#each direction.routes as route, routeIndex}
+                        <li class="route-item bus">
+                          <span class="group-label arrival-emphasis" class:ghost={routeIndex > 0}>
+                            {direction.direction}
+                          </span>
                           <span class="route-label">
-                            <span class="route-name bus">{route.route}</span>
+                            <span class="route-name">{route.route}</span>
                             <span class="route-type">{route.typeLabel}</span>
                           </span>
                           <span class="eta-stack">
                             {#each route.etas as eta}
                               <span class="eta-line">
-                                <span class={`eta-part eta-value ${eta.timingClass} ${eta.descriptor}`}>{etaValueText(eta.minutes)}</span>
-                                {#if etaUnitText(eta.minutes)}
-                                  <span class="eta-unit">{etaUnitText(eta.minutes)}</span>
-                                {/if}
+                                <span class={`eta-part eta-min ${eta.timingClass} ${eta.descriptor}`}>
+                                  <span class="eta-value">{etaValueText(eta.minutes)}</span>
+                                  {#if etaUnitText(eta.minutes)}
+                                    <span class="eta-unit">{etaUnitText(eta.minutes)}</span>
+                                  {/if}
+                                </span>
                                 <span class={`eta-part clock`}>{eta.clockText}</span>
                               </span>
                             {/each}
@@ -1281,10 +1288,7 @@
 
   .direction-group-item {
     margin: 2px 0;
-    display: flex;
-    flex-wrap: wrap;
-    gap: 4px;
-    align-items: flex-start;
+    display: block;
   }
 
 
@@ -1348,37 +1352,60 @@
 
   .route-item {
     display: grid;
-    grid-template-columns: minmax(130px, max-content) minmax(0, 1fr);
-    align-items: start;
-    column-gap: 10px;
+    grid-template-columns: minmax(96px, max-content) minmax(0, 1fr) max-content max-content;
+    align-items: baseline;
+    column-gap: 8px;
     margin-top: 1px;
     margin-bottom: 0.2rem;
+    width: 100%;
+  }
+
+  .group-label {
+    display: inline-flex;
+    align-items: baseline;
+    white-space: nowrap;
+  }
+
+  .group-label.ghost {
+    visibility: hidden;
   }
 
   .route-label {
     display: inline-flex;
     align-items: baseline;
     gap: 6px;
+    min-width: 0;
     white-space: nowrap;
   }
 
-  .route-type {
-
+  .route-item.bus .route-type {
+    display: none;
   }
 
   .eta-stack {
-    display: inline-grid;
+    grid-column: 3 / span 2;
+    display: grid;
     grid-auto-rows: min-content;
     align-items: flex-start;
     row-gap: 2px;
+    width: 100%;
   }
 
   .eta-line {
-    display: inline-grid;
-    grid-template-columns: minmax(2ch, max-content) max-content max-content;
+    display: grid;
+    grid-template-columns: max-content max-content;
     align-items: baseline;
-    column-gap: 4px;
+    column-gap: 10px;
+    justify-content: end;
     white-space: nowrap;
+    width: 100%;
+  }
+
+  .eta-min {
+    display: inline-flex;
+    align-items: baseline;
+    gap: 3px;
+    justify-self: end;
   }
 
   .eta-part {
@@ -1389,14 +1416,9 @@
     text-align: right;
   }
 
-  .eta-value.now {
-     margin-left: 0.5ch;
-  }
-
   .eta-part.clock {
     font-size: 0.9rem;
     font-weight: 300;
-    padding-left: 0.3rem;
   }
 
   .eta-prefix {
@@ -1471,6 +1493,30 @@
     .legend {
       grid-column: 2;
       grid-row: 2;
+    }
+
+    .arrival-item {
+      padding: 10px 12px;
+      font-size: 0.98rem;
+      line-height: 1.35;
+    }
+
+    .stop-name {
+      font-size: 1.22em;
+    }
+
+    .route-list,
+    .direction-list,
+    .route-item {
+      max-width: 40rem;
+    }
+
+    .route-item {
+      column-gap: 6px;
+    }
+
+    .eta-part.clock {
+      font-size: 0.95rem;
     }
   }
 
