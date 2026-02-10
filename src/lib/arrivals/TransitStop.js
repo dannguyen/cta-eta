@@ -37,7 +37,7 @@ function compareLocaleWithFallback(
 function normalizeEtas(arrivals, walkMinutes) {
   return [...arrivals]
     .sort((a, b) => predictionSortTime(a) - predictionSortTime(b))
-    .slice(0, 2)
+    .slice(0, 3)
     .map((arrival) => {
       const etaMinutes = arrival.getEtaMinutes();
       return {

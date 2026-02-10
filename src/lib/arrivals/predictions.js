@@ -153,22 +153,22 @@ export async function fetchTrainPredictions(
       continue;
     }
 
-    const topTwo = group
+    const topArrivals = group
       .filter(
         (arrival) =>
           String(arrival.stationId ?? arrival.stopId) === chosenStationId,
       )
       .sort((a, b) => predictionTimestamp(a) - predictionTimestamp(b))
-      .slice(0, 2);
+      .slice(0, 3);
 
-    if (!topTwo.length) {
+    if (!topArrivals.length) {
       continue;
     }
 
     selectedStopIds.add(chosenStationId);
     const stationPredictions = results.get(chosenStationId) ?? [];
     stationPredictions.push(
-      ...topTwo.map((arrival) =>
+      ...topArrivals.map((arrival) =>
         normalizeTrainArrival(arrival, chosenStationId, stationById),
       ),
     );
@@ -209,7 +209,7 @@ export async function fetchBusPredictions(
   for (const idsChunk of chunk(stopIds, 10)) {
     const url = new URL(endpointUrl(endpoint, baseOrigin));
     url.searchParams.set("stpid", idsChunk.join(","));
-    url.searchParams.set("top", "40");
+    url.searchParams.set("top", "100");
 
     try {
       const response = await fetchFn(url);
@@ -273,18 +273,18 @@ export async function fetchBusPredictions(
       .slice(0, 2);
 
     for (const stopId of closestStops) {
-      const topTwo = group
+      const topArrivals = group
         .filter((arrival) => String(arrival.stopId) === stopId)
         .sort((a, b) => predictionTimestamp(a) - predictionTimestamp(b))
-        .slice(0, 2);
+        .slice(0, 3);
 
-      if (!topTwo.length) {
+      if (!topArrivals.length) {
         continue;
       }
 
       selectedStopIds.add(stopId);
       const stopPredictions = results.get(stopId) ?? [];
-      stopPredictions.push(...topTwo);
+      stopPredictions.push(...topArrivals);
       results.set(stopId, stopPredictions);
     }
   }

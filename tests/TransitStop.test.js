@@ -48,6 +48,7 @@ describe("TransitStop grouping", () => {
       arrivals: [
         makeArrival("147", "Northbound", 5, "bus"),
         makeArrival("147", "Northbound", 11, "bus"),
+        makeArrival("147", "Northbound", 14, "bus"),
         makeArrival("146", "Southbound", 8, "bus"),
       ],
     });
@@ -62,7 +63,7 @@ describe("TransitStop grouping", () => {
     const route147 = grouped.routes.find((route) => route.route === "147");
     expect(route147.destinations).toHaveLength(1);
     expect(route147.destinations[0].direction).toBe("Northbound");
-    expect(route147.destinations[0].etas).toHaveLength(2);
+    expect(route147.destinations[0].etas).toHaveLength(3);
   });
 
   it("groups train arrivals by route then direction", () => {

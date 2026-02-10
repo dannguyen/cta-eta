@@ -42,16 +42,20 @@
 
 <li class="arrival-item" id={safeStop.anchorId}>
   <div class="stop-header">
-    <span class="stop-name">
-      <span class="arrival-emoji">{safeStop.icon}</span>
-      <span class="name">{safeStop.name}</span>
-      {#if safeStop.type === 'train'}
-      <span class="category">{safeStop.stopCategory}</span>
-      {/if}
-    </span>
+    <div class="header-main">
+      <span class="arrival-emoji-frame">
+        <span class="arrival-emoji">{safeStop.icon}</span>
+      </span>
+      <span class="stop-name">
+        <span class="name">{safeStop.name}</span>
+        {#if safeStop.type === 'train'}
+          <span class="category">{safeStop.stopCategory}</span>
+        {/if}
+      </span>
 
-    <span class="walk-eta">{distance.walkText}</span>
-    <span class="distance">({distance.distanceText})</span>
+      <span class="walk-eta">{distance.walkText}</span>
+      <span class="distance">({distance.distanceText})</span>
+    </div>
   </div>
 
   <ul class="route-list">
@@ -74,17 +78,34 @@
   }
 
   .arrival-emoji {
-    padding-right: 0.2em;
-    background: white;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.05em;
+    line-height: 1;
+  }
+
+  .arrival-emoji-frame {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: #ffffff;
+    border-radius: 999px;
+    padding: 2px 6px;
   }
 
   .stop-header {
-    background: black;
+    width: 100%;
+  }
+
+  .header-main {
+    background: #111111;
+    border-radius: 8px;
     display: grid;
-    grid-template-columns: minmax(96px, max-content) minmax(0, 1fr) max-content max-content;
+    grid-template-columns: auto minmax(0, 1fr) max-content max-content;
     align-items: center;
     column-gap: 8px;
-    width: 100%;
+    padding: 6px 10px;
   }
 
   .route-list {
@@ -94,33 +115,28 @@
   }
 
   .stop-name {
-    font-size: 1.1em;
-    font-weight: 700;
+    font-size: 1.06em;
+    font-weight: 600;
     color: white;
-    padding-right: 0.2em;
-    padding-top: 0.2em;
-    padding-bottom: 0.2em;
-  }
-
-  .stop-name {
-    grid-column: 1 / span 2;
+    min-width: 0;
   }
 
   .walk-eta {
-    grid-column: 3;
     justify-self: end;
     white-space: nowrap;
-    color: #ccc;
+    color: #f0f0f0;
     font-weight: 600;
   }
 
   .distance {
-    grid-column: 4;
     justify-self: end;
     white-space: nowrap;
-    color: #aaa;
+    color: #c8c8c8;
     font-weight: 400;
-        padding-right: 0.2em;
+  }
+
+  .category {
+    font-weight: 500;
   }
 
   @media (min-width: 900px) {
@@ -131,8 +147,11 @@
     }
 
     .stop-header {
-      column-gap: 6px;
       max-width: 40rem;
+    }
+
+    .header-main {
+      padding: 7px 12px;
     }
 
     .stop-name {
@@ -153,6 +172,11 @@
 
     .route-list {
       padding-left: 0;
+    }
+
+    .header-main {
+      padding: 5px 8px;
+      column-gap: 6px;
     }
 
     .walk-eta,

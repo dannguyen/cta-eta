@@ -23,7 +23,6 @@
   const BUS_API_URL = apiEndpoint('api/bus');
 
   let loading = false;
-  let loadingMessage = '';
   let errorMessage = '';
 
   let userLocation = null;
@@ -131,13 +130,11 @@
     nearbyStops = [];
 
     try {
-      loadingMessage = 'Requesting your location...';
       userLocation = await getUserLocation();
       if (currentNonce !== loadNonce) {
         return;
       }
 
-      loadingMessage = 'Loading CTA stop datasets...';
       const [trainCsv, busCsv] = await Promise.all([
         fetchText(withBasePath('data/cta-train-stations.csv', base)),
         fetchText(withBasePath('data/cta-bus-stops.csv', base))
@@ -156,7 +153,6 @@
       filteredTrainStations = foundTrainStations;
       filteredBusStops = foundBusStops.slice(0, 10);
 
-      loadingMessage = 'Loading train and bus ETAs...';
       const [trainData, busData] = await Promise.all([
         fetchTrainPredictions(filteredTrainStations, {
           endpoint: apiEndpoint('api/train'),
@@ -214,7 +210,6 @@
     } finally {
       if (currentNonce === loadNonce) {
         loading = false;
-        loadingMessage = '';
       }
     }
   }
@@ -234,12 +229,6 @@
       }
     };
   });
-
-  $: stopCounts = {
-    total: nearbyStops.length,
-    bus: nearbyStops.filter((stop) => stop.type === 'bus').length,
-    train: nearbyStops.filter((stop) => stop.type === 'train').length
-  };
 
   $: visibleTrainLineCodes = new Set(
     upcomingTransitStops
@@ -268,26 +257,14 @@
 
 <main>
   <header class="site-title">
-    <h1>CTA ETA</h1>
+    <div class="title-row">
+      <h1>CTA ETA</h1>
+      <button type="button" on:click={reload} disabled={loading}>Refresh</button>
+    </div>
     <h2>Chicago Transit Nearest You</h2>
   </header>
 
   <section class="top-layout">
-    <section class="top-controls">
-    <div class="toolbar">
-      <button type="button" on:click={reload} disabled={loading}>Refresh</button>
-      {#if loading}
-        <span class="status">{loadingMessage}</span>
-      {:else if errorMessage}
-        <span class="status error">{errorMessage}</span>
-      {:else}
-        <span class="status">
-          {stopCounts.total} nearby stops ({stopCounts.train} train, {stopCounts.bus} bus)
-        </span>
-      {/if}
-    </div>
-    </section>
-
     <section class="map-wrap">
       <div class="map" bind:this={mapContainer}></div>
     </section>
@@ -423,14 +400,23 @@
   }
 
   main {
-    max-width: 1100px;
-    margin: 0 auto;
+    width: min(1100px, 100%);
+    margin-left: auto;
+    margin-right: auto;
     padding: 20px;
+    box-sizing: border-box;
   }
 
   header h1 {
     margin: 0;
     font-size: clamp(1.6rem, 3vw, 2.2rem);
+  }
+
+  .title-row {
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
+    gap: 8px;
   }
 
   .top-layout {
@@ -439,20 +425,6 @@
     grid-template-columns: minmax(0, 1fr);
     gap: 12px;
     align-items: start;
-  }
-
-  .top-controls {
-    border: 1px solid #dbe4ef;
-    border-radius: 12px;
-    background: #ffffff;
-    padding: 10px;
-  }
-
-  .toolbar {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 10px;
-    align-items: center;
   }
 
   button {
@@ -468,15 +440,6 @@
   button:disabled {
     opacity: 0.55;
     cursor: default;
-  }
-
-  .status {
-    color: #334155;
-    font-size: 0.95rem;
-  }
-
-  .status.error {
-    color: #b42318;
   }
 
   .map-wrap {
@@ -564,22 +527,17 @@
     .top-layout {
       grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
       column-gap: 16px;
-      row-gap: 12px;
+      row-gap: 0;
     }
 
     .map-wrap {
       grid-column: 1;
-      grid-row: 1 / span 2;
-    }
-
-    .top-controls {
-      grid-column: 2;
       grid-row: 1;
     }
 
     .legend {
       grid-column: 2;
-      grid-row: 2;
+      grid-row: 1;
     }
   }
 

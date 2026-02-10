@@ -12,7 +12,7 @@ function jsonResponse(payload) {
 }
 
 describe("fetchTrainPredictions", () => {
-  it("selects the closest station per route+destination and up to two ETAs", async () => {
+  it("selects the closest station per route+destination and up to three ETAs", async () => {
     const stops = [
       { stopId: "30170", stationId: "30170", distanceMiles: 0.2 },
       { stopId: "30200", stationId: "30200", distanceMiles: 0.4 },
@@ -34,6 +34,12 @@ describe("fetchTrainPredictions", () => {
               rt: "Red",
               destNm: "Howard",
               arrT: "2030-01-01T12:10:00",
+            },
+            {
+              staId: "30170",
+              rt: "Red",
+              destNm: "Howard",
+              arrT: "2030-01-01T12:14:00",
             },
             {
               staId: "30170",
@@ -90,7 +96,7 @@ describe("fetchTrainPredictions", () => {
       (prediction) =>
         prediction.route === "Red" && prediction.destination === "Howard",
     );
-    expect(redHoward).toHaveLength(2);
+    expect(redHoward).toHaveLength(3);
     expect(
       redHoward.every((prediction) => String(prediction.stopId) === "30170"),
     ).toBe(true);
@@ -103,7 +109,7 @@ describe("fetchTrainPredictions", () => {
 });
 
 describe("fetchBusPredictions", () => {
-  it("selects two closest stops per route+direction and keeps up to two ETAs per stop", async () => {
+  it("selects two closest stops per route+direction and keeps up to three ETAs per stop", async () => {
     const stops = [
       { stopId: "5001", distanceMiles: 0.1 },
       { stopId: "5002", distanceMiles: 0.2 },
@@ -130,6 +136,15 @@ describe("fetchBusPredictions", () => {
             des: "Howard",
             prdtm: "20300101 12:12",
             prdctdn: "12",
+          },
+          {
+            stpid: "5001",
+            stpnm: "Stop A",
+            rt: "147",
+            rtdir: "Northbound",
+            des: "Howard",
+            prdtm: "20300101 12:14",
+            prdctdn: "14",
           },
           {
             stpid: "5002",
@@ -190,7 +205,7 @@ describe("fetchBusPredictions", () => {
       "5002",
       "5003",
     ]);
-    expect(result.predictionsByStop.get("5001")).toHaveLength(2);
+    expect(result.predictionsByStop.get("5001")).toHaveLength(3);
     expect(result.predictionsByStop.get("5002")).toHaveLength(2);
     expect(result.predictionsByStop.get("5003")).toHaveLength(2);
   });

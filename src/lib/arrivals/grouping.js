@@ -211,7 +211,7 @@ export function groupBusStopsByName(candidateBusStops, busData) {
       .flatMap((directionPredictions) =>
         [...directionPredictions]
           .sort((a, b) => predictionSortTime(a) - predictionSortTime(b))
-          .slice(0, 2),
+          .slice(0, 3),
       )
       .sort((a, b) => predictionSortTime(a) - predictionSortTime(b));
 
@@ -231,7 +231,7 @@ export function buildTrainStopsFromArrivals(
   candidateTrainStations,
   arrivals,
   trainRoutes,
-  maxClosestArrivals = 2,
+  maxClosestArrivals = 3,
 ) {
   if (
     !trainRoutes ||
@@ -347,7 +347,7 @@ export function buildBusStopsFromArrivals(
   candidateBusStops,
   arrivals,
   busRoutes,
-  maxClosestArrivals = 2,
+  maxClosestArrivals = 3,
 ) {
   if (!busRoutes || typeof busRoutes !== "object" || Array.isArray(busRoutes)) {
     throw new TypeError(

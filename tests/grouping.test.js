@@ -393,7 +393,7 @@ describe("build stops from TransitArrival instances", () => {
     );
 
     expect(defaultLimited).toHaveLength(1);
-    expect(defaultLimited[0].predictions).toHaveLength(2);
+    expect(defaultLimited[0].predictions).toHaveLength(3);
     expect(onePerRoute).toHaveLength(1);
     expect(onePerRoute[0].predictions).toHaveLength(1);
     expect(onePerRoute[0].predictions[0].getEtaMinutes()).toBe(2);
@@ -557,7 +557,7 @@ describe("build stops from TransitArrival instances", () => {
     );
 
     expect(defaultLimited).toHaveLength(1);
-    expect(defaultLimited[0].predictions).toHaveLength(2);
+    expect(defaultLimited[0].predictions).toHaveLength(3);
     expect(onePerRoute).toHaveLength(1);
     expect(onePerRoute[0].predictions).toHaveLength(1);
     expect(onePerRoute[0].predictions[0].getEtaMinutes()).toBe(2);
@@ -639,6 +639,14 @@ describe("buildUpcomingStops", () => {
             minutes: 13,
           }),
           makeBusArrival({
+            stopId: 1001,
+            route: "147",
+            direction: "Northbound",
+            destination: "Howard",
+            stopName: "Sheridan & Winthrop",
+            minutes: 18,
+          }),
+          makeBusArrival({
             stopId: 1002,
             route: "146",
             direction: "Southbound",
@@ -662,6 +670,6 @@ describe("buildUpcomingStops", () => {
     const route147 = upcoming[0].routes.find((route) => route.route === "147");
     expect(route147.destinations).toHaveLength(1);
     expect(route147.destinations[0].direction).toBe("Northbound");
-    expect(route147.destinations[0].etas).toHaveLength(2);
+    expect(route147.destinations[0].etas).toHaveLength(3);
   });
 });
